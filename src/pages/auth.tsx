@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-
+import { signIn } from "next-auth/react";
+import Email from "next-auth/providers/email";
 
 
 export default function AuthPage() {
@@ -17,22 +18,34 @@ export default function AuthPage() {
     e.preventDefault();
     setError("");
 
-    const endpoint = isSignUp ? "/api/auth/signup" : "/api/auth/signin";
-    const res = await fetch(endpoint, {
-      method: "POST",
-      body: JSON.stringify(form),
-      headers: { "Content-Type": "application/json" },
-    });
+    if(isSignUp) {
 
-    const data = await res.json();
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        body: JSON.stringify(form),
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      
+      if(!res.ok){
+        setError(data.message || "Signup Failed")
+        return;
+      }
+      }  
+  
+      const res = await signIn("credentials", {
+        redirect: false,
+        email: form.email,
+        password: form.password,
+      });
     
-    if (res.ok) {
-      router.push('/dashboard')
-    } else {
-      setError(data.message || "Something went wrong");
-    }
-    
-  };
+      if (res?.error) {
+            setError(res.error)
+          } else {
+            router.push('/dashboard')
+          }
+    };
+
 
   return (
     <div>

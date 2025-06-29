@@ -13,11 +13,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-
-    // ✅ FIX: this baseUrl is missing and must be set
     "baseUrl": ".", 
-
-    // ✅ Already correct — this makes @/lib/prisma point to src/lib/prisma.ts
     "paths": {
       "@/*": ["src/*"]
     }

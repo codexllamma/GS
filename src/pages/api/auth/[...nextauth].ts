@@ -1,12 +1,14 @@
-import NextAuth from "next-auth";
+// pages/api/auth/[...nextauth].ts
+import NextAuth, { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { PrismaClient } from "@/generated/prisma";
 import bcrypt from "bcrypt";
+import { JWT } from "next-auth/jwt";
 
 const prisma = new PrismaClient();
 
-const handler = NextAuth({
+export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
@@ -17,7 +19,7 @@ const handler = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Invalid credentials");
+          throw new Error("Missing credentials");
         }
 
         const user = await prisma.user.findUnique({
@@ -25,16 +27,21 @@ const handler = NextAuth({
         });
 
         if (!user || !user.password) {
-          throw new Error("User not found");
-        }
-       
-        
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) {
-          throw new Error("Incorrect password");
+          throw new Error("No user found");
         }
 
-        return user;
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isValid) {
+          throw new Error("Invalid password");
+        }
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          isAdmin: user.isAdmin,
+
+        };
       },
     }),
   ],
@@ -42,20 +49,27 @@ const handler = NextAuth({
     strategy: "jwt",
   },
   pages: {
-    signIn: "/", // redirect to your auth page
+    signIn: "/",
   },
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.id = user.id;
+      if (user) {
+        token.id = user.id;
+        token.isAdmin = user.isAdmin;
+      }
+      console.log("Token", token, "USer", user);
       return token;
     },
     async session({ session, token }) {
-      if (token) (session.user as any).id = token.id as string;
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.isAdmin = token.isAdmin as boolean;
+      }
+      console.log("Session", session, 'Token', token);
       return session;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-});
+};
 
-export default handler;
-
+export default NextAuth(authOptions);
