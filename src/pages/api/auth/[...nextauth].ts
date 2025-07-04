@@ -57,7 +57,7 @@ export const authOptions: AuthOptions = {
         token.id = user.id;
         token.isAdmin = user.isAdmin;
       }
-      console.log("Token", token, "USer", user);
+
       return token;
     },
     async session({ session, token }) {
@@ -65,7 +65,7 @@ export const authOptions: AuthOptions = {
         session.user.id = token.id as string;
         session.user.isAdmin = token.isAdmin as boolean;
       }
-      console.log("Session", session, 'Token', token);
+
       return session;
     },
   },

@@ -1,4 +1,4 @@
-import AdminProductsPage from "@/pages/admin/products";
+import AdminProductsPage from "@/pages/admin/adminProducts";
 
 const AdminDashboard = () => {
   

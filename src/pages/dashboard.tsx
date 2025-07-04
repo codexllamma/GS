@@ -1,25 +1,26 @@
-import { signIn, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import AdminDashboard from "@/components/adminDashboard";
 import UserDashboard from "@/components/userDashboard";
-import Router, { useRouter } from "next/router";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
 
 const Dashboard = () => {
-  const router = useRouter();
-  const {data: session, status} = useSession();
-  
-  if(status === "loading") return <p>Loading...</p>;
-  
-  if(!session?.user?.isAdmin){
-    router.push('/ ') ;
-    return null;
-  }
-  
-  return (
-    <>
-      {session?.user.isAdmin ? <AdminDashboard/> : <UserDashboard/>}
-    </>
-  );
-}
+    const router = useRouter();
+    const { data: session, status } = useSession();
+
+    useEffect(() => {
+        if (status === "unauthenticated") {
+            router.push("/auth");
+        }
+    }, [status, router]);
+
+    if (status === "loading") return <p>Loading...</p>;
+
+    return (
+        <>
+            {session?.user?.isAdmin ? <AdminDashboard /> : <UserDashboard />}
+        </>
+    );
+};
 
 export default Dashboard;
-

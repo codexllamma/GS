@@ -15,15 +15,17 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())     // Primary key, auto-generated unique string ID
-  email     String   @unique                 // Email must be unique in DB
-  password  String                           // Hashed password
-  name      String?                          // Optional (nullable) name
-  isAdmin   Boolean  @default(false)         // Admin flag
-  orders    Order[]                          // One-to-many relation: 1 User → Many Orders
-  createdAt DateTime @default(now())         // Timestamp of creation
-  accounts  Account[]
-  session   Session[]
+  id         String   @id @default(cuid())     // Primary key, auto-generated unique string ID
+  email      String   @unique                 // Email must be unique in DB
+  password   String                           // Hashed password
+  name       String?                          // Optional (nullable) name
+  isAdmin    Boolean  @default(false)         // Admin flag
+  orders     Order[]  
+  cartOrders CartOrder[]                        // One-to-many relation: 1 User → Many Orders
+  createdAt  DateTime @default(now())         // Timestamp of creation
+  adress     String?
+  accounts   Account[]
+  session    Session[]
   
 }
 
@@ -35,7 +37,7 @@ model Order {
   deliveryCharge Float
   total          Float
   createdAt      DateTime @default(now())
-
+  adress         String 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -84,4 +86,19 @@ model Product {
   category    String
   stock       Int
   createdAt   DateTime @default(now())
+  cartOrders  CartOrder[]
 }
+
+model CartOrder {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+
+  quantity  Int      @default(1)
+
+  createdAt DateTime @default(now())
+}
+
