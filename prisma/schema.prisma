@@ -23,22 +23,50 @@ model User {
   orders     Order[]  
   cartOrders CartOrder[]                        // One-to-many relation: 1 User → Many Orders
   createdAt  DateTime @default(now())         // Timestamp of creation
-  adress     String?
+  address     String?
   accounts   Account[]
   session    Session[]
   
 }
 
+enum PaymentMethod{
+  COD 
+  RAZORPAY
+  STRIPE
+}
+
+enum Status{
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
 model Order {
   id             String   @id @default(uuid())
   userId         String
-  items          Json
+  orderItems     OrderItem[]
   subtotal       Float 
   deliveryCharge Float
   total          Float
   createdAt      DateTime @default(now())
-  adress         String 
+  address        String 
+  paymentMethod  PaymentMethod
+  status         Status
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  productId       String
+  quantity        Int
+  priceAtPurchase Float
+  createdAt       DateTime @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
 }
 
 model Account {
@@ -87,6 +115,7 @@ model Product {
   stock       Int
   createdAt   DateTime @default(now())
   cartOrders  CartOrder[]
+  orderItems  OrderItem[]
 }
 
 model CartOrder {

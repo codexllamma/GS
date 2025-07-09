@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Head from "next/head";
+import { useRouter } from "next/router";
 
 interface Product {
   id: string;
@@ -18,7 +19,7 @@ interface CartItem {
 export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const router = useRouter();
   const fetchCart = async () => {
       try {
         const res = await fetch("/api/cart");
@@ -136,9 +137,12 @@ export default function CartPage() {
             <div className="text-right font-bold text-lg mt-6">
               Total: ₹{totalPrice}
             </div>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-4 w-full sm:w-auto">
-              Proceed to Checkout
-            </button>
+           <button
+            disabled={cartItems.length === 0}
+            className="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
+            onClick={() => router.push("/checkout")}
+          > Proceed to Checkout </button>
+
           </div>
         )}
       </div>
