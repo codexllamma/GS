@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
+  
+
   if (!session?.user?.id) {
     return res.status(401).json({ message: "Unauthorized" });
   }
@@ -29,13 +31,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const existingCartItem = await prisma.cartOrder.findFirst({
         where: { userId, productId },
       });
-
+      
       if (existingCartItem) {
-        const updatedCartItem = await prisma.cartOrder.update({
-          where: { id: existingCartItem.id },
-          data: { quantity: existingCartItem.quantity + quantity },
+        
+        return res.status(409).json({
+          message: "Product already exists in cart and the quantity can be incremented there."
         });
-        return res.status(200).json(updatedCartItem);
       } else {
         const newCartItem = await prisma.cartOrder.create({
           data: { userId, productId, quantity },
@@ -45,18 +46,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === "PUT") {
-      const { cartOrderId, quantity } = req.body;
-      if (!cartOrderId || quantity == null) {
-        return res.status(400).json({ message: "cartOrderId and quantity are required" });
-      }
+  const { cartOrderId, quantity } = req.body;
+  if (!cartOrderId || quantity == null) {
+    return res.status(400).json({ message: "cartOrderId and quantity are required" });
+  }
 
-      const updatedCartItem = await prisma.cartOrder.update({
-        where: { id: cartOrderId },
-        data: { quantity },
-      });
-      
-      return res.status(200).json(updatedCartItem);
+  try {
+    // Fetch cart item with product
+    const cartOrder = await prisma.cartOrder.findUnique({
+      where: { id: cartOrderId },
+      include: { product: true },
+    });
+
+    if (!cartOrder) {
+      return res.status(404).json({ message: "Cart item not found." });
     }
+
+    if (quantity > cartOrder.product.stock) {
+    const availableStock = cartOrder.product.stock;
+    return res.status(400).json({
+      message:
+        availableStock === 0
+          ? "This product is currently out of stock."
+          : `Only ${availableStock} unit${availableStock > 1 ? "s" : ""} available for purchase.`,
+    });
+   }
+
+
+    const updatedCartItem = await prisma.cartOrder.update({
+      where: { id: cartOrderId },
+      data: { quantity },
+    });
+
+    return res.status(200).json(updatedCartItem);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error." });
+  }
+}
 
     if (req.method === "DELETE") {
       const { cartOrderId } = req.body;

@@ -19,7 +19,22 @@ interface CartItem {
 export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  
+  useEffect(() => {
+  if (error) {
+    const timer = setTimeout(() => {
+      setError(null);
+    }, 3500);
+
+    return () => clearTimeout(timer); // cleanup if component unmounts or uiMessage changes
+  }
+  }, [error]);
+  
+
+  
+
   const fetchCart = async () => {
       try {
         const res = await fetch("/api/cart");
@@ -46,13 +61,13 @@ export default function CartPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cartOrderId, quantity: newQuantity }),
       });
-
-      if (!res.ok) throw new Error("Failed to update quantity");
-      const updatedItem = await res.json();
-      /*
-      setCartItems((prev) =>
-        prev.map((item) => (item.id === cartOrderId ? updatedItem : item))
-      );*/
+      
+      
+      const data = await res.json();
+      if (!res.ok) setError(data.message || "Failed to update quantity")
+      
+      
+      
       fetchCart();
     } catch (error) {
       console.error(error);
@@ -67,7 +82,7 @@ export default function CartPage() {
         body: JSON.stringify({ cartOrderId }),
       });
       console.log(cartOrderId);
-      if (!res.ok) throw new Error("Failed to delete item");
+      if (!res.ok) setError("Failed to delete item");
 
       setCartItems((prev) => prev.filter((item) => item.id !== cartOrderId));
     } catch (error) {
@@ -85,12 +100,14 @@ export default function CartPage() {
       <Head>
         <title>Cart | YourStore</title>
       </Head>
+
       <div className="max-w-4xl mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6">Your Cart</h1>
         {loading && <p>Loading cart...</p>}
         {!loading && cartItems.length === 0 && (
           <p>Your cart is empty. Start shopping!</p>
         )}
+        {error && <p className="text-red-500">{error}</p>}
         {!loading && cartItems.length > 0 && (
           <div className="space-y-4">
             {cartItems.map((item) => (
