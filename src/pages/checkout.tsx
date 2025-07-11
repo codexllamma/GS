@@ -67,7 +67,7 @@ export default function CheckoutPage() {
       alert("Checkout failed.");
     }
   };
-
+  
   if (loading) return <p>Loading checkout...</p>;
 
   return (
