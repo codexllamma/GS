@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Head from "next/head";
 import { useCartStore } from "@/store/useCartStore";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
 
 interface Product {
   id: string;
@@ -18,7 +19,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const router = useRouter();
 
   const { data: session, status } = useSession();
   const addToLocalCart = useCartStore((state) => state.addToCart);
@@ -51,6 +52,10 @@ export default function ProductsPage() {
 
     fetchProducts();
   }, []);
+
+  const handleViewProduct = (id: string) => {
+  router.push(`/product/${id}`);
+  };
 
   const handleAddToCart = async (product: Product) => {
     if (status !== "authenticated") {
@@ -117,12 +122,12 @@ export default function ProductsPage() {
                   key={product.id}
                   className="border rounded-lg p-4 shadow hover:shadow-lg transition"
                 >
-                  {/* Uncomment when images are ready */}
-                  {/* <img
+                  
+                  <img
                     src={product.image}
                     alt={product.name}
                     className="w-full h-48 object-cover rounded"
-                  /> */}
+                  /> 
                   <h2 className="text-lg font-semibold mt-2">{product.name}</h2>
                   <p className="text-gray-500">{product.category}</p>
                   <p className="text-primary font-bold mt-1">₹{product.price}</p>
@@ -158,10 +163,16 @@ export default function ProductsPage() {
                           ? "Added to Cart"
                           : "Add to Cart"}
                       </button>
-
                   )}
+                  <button 
+                  onClick={() => handleViewProduct(product.id)}
+                  className="bg-amber-500 hover:bg--white mt-3 w-full py-2 rounded">
+                    View Product
+                  </button>
                 </div>
+                
               );
+              
             })}
           </div>
         )}

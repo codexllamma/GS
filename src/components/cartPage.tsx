@@ -117,6 +117,14 @@ export default function CartPage() {
               >
                 <div>
                   <p className="font-semibold">{item.product.name}</p>
+                  {item.product.image && (
+                    <img
+                      src={item.product.image}
+                      alt={item.product.name}
+                      className="w-16 h-16 object-cover rounded"
+                    />
+                  )}
+
                   <p className="text-sm text-gray-500">
                     Category: {item.product.category}
                   </p>

@@ -1,4 +1,4 @@
-import ProductsPage from "@/pages/products";
+import ProductsPage from "@/pages/product/products";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 

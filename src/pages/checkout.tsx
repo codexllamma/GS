@@ -112,7 +112,15 @@ export default function CheckoutPage() {
               <li key={item.id} className="flex justify-between mb-2">
                 <span>{item.product?.name} × {item.quantity}</span>
                 <span>₹{item.product?.price * item.quantity}</span>
+                {item.product.image && (
+                  <img
+                    src={item.product.image}
+                    alt={item.product.name}
+                    className="w-16 h-16 object-cover rounded"
+                  />
+                )}
               </li>
+              
             ))}
             <hr className="my-2" />
             <div className="flex justify-between font-bold">
