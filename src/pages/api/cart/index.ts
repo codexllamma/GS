@@ -19,7 +19,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { userId },
         include: { product: true },
       });
-      return res.status(200).json(cartItems);
+      const serializedCart = cartItems.map((item) => ({
+        ...item,
+        product: {
+          ...item.product,
+          createdAt: item.product.createdAt.toISOString(),
+        },
+      }));
+      
+      return res.status(200).json(serializedCart);
+      
     }
 
     if (req.method === "POST") {

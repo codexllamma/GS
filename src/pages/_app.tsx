@@ -1,9 +1,10 @@
-import "@/styles/globals.css";
+import "../styles/globals.css";
 import type { AppProps } from "next/app";
 import { SessionProvider } from "next-auth/react";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useCartStore } from "@/store/useCartStore";
+import Hero from "./hero";
 
 function AuthGate() {
   const { data: session, status } = useSession();
@@ -23,7 +24,8 @@ export default function App({ Component, pageProps:{session, ...pageProps} }: Ap
 
   return (
     <SessionProvider session={session}>
-      <AuthGate/>
+      {/*<Hero/>*/}
+      {/*<AuthGate/>*/}
       <Component {...pageProps} />
     </SessionProvider>
     

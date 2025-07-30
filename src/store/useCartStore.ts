@@ -18,6 +18,7 @@ interface CartStore {
 
 export const useCartStore = create<CartStore>((set, get) => ({
   cart: [],
+  
 
   fetchCart: async () => {
     const res = await fetch("/api/cart");
