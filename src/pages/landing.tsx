@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ShoppingBag, Sparkles } from "lucide-react";
 import AuthPage from "./auth";
 
-const Hero = () => {
+const Landing = () => {
   const [showAuth, setShowAuth] = useState(false);
 
   return (
@@ -171,4 +171,4 @@ const Hero = () => {
   );
 };
 
-export default Hero;
+export default Landing;

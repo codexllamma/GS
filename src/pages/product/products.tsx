@@ -24,7 +24,7 @@ export default function ProductsPage() {
   const { status } = useSession();
   const addToCartStore = useCartStore((state) => state.addToCart);
 
-  // Auto-clear error after 3.5s
+  
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => setError(null), 3500);
@@ -32,7 +32,7 @@ export default function ProductsPage() {
     }
   }, [error]);
 
-  // Fetch products
+  
   useEffect(() => {
     (async () => {
       try {
@@ -77,7 +77,7 @@ export default function ProductsPage() {
       }
 
       setAddedToCartIds((prev) => [...prev, product.id]);
-      addToCartStore(product.id, 1); // ✅
+      addToCartStore(product.id, 1); 
 
       alert("Added to cart!");
     } catch (err) {

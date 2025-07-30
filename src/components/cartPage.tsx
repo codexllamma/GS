@@ -3,12 +3,18 @@ import Link from 'next/link';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowLeft } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useState,useEffect } from 'react';
 
 const CartPage: React.FC = () => {
   
-  const { cart,updateQuantity, removeFromCart } = useCartStore();
+  const { cart,updateQuantity, removeFromCart,fetchCart } = useCartStore();
   const items = cart.reduce((sum, item) => sum + item.quantity, 0);
   const total = cart.reduce((sum, item) => sum + item.quantity * item.product.price, 0);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+useEffect(() => {
+  fetchCart().then(() => setIsLoaded(true));
+}, []);
   
   if (cart.length === 0) {
     return (
@@ -58,10 +64,10 @@ const CartPage: React.FC = () => {
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
             <AnimatePresence>
-              {cart.map((item) => (
+              {isLoaded && cart.map((item) => (
                 <motion.div
                   key={item.product.id}
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   className="bg-white rounded-2xl p-6 shadow-sm"
@@ -92,16 +98,16 @@ const CartPage: React.FC = () => {
                           onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
                           className="p-2 hover:bg-gray-100 transition-colors"
                         >
-                          <Minus size={16} />
+                          <Minus color='gray' size={16} />
                         </button>
-                        <span className="px-4 py-2 border-x border-gray-300 min-w-[3rem] text-center">
+                        <span className="px-4 py-2 border-x text-gray-800 border-gray-300 min-w-[3rem] text-center">
                           {item.quantity}
                         </span>
                         <button
                           onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
                           className="p-2 hover:bg-gray-100 transition-colors"
                         >
-                          <Plus size={16} />
+                          <Plus color='gray' size={16} />
                         </button>
                       </div>
                       

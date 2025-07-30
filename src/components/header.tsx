@@ -10,7 +10,7 @@ const Header: React.FC = () => {
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <header className="sticky top-0 z-50 glass-effect border-b border-primary-100/50">
+    <header className="sticky top-0 z-50 glass-effect bg-[#0f172a] border-b border-primary-100/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -30,48 +30,54 @@ const Header: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/" className="text-dark-600 hover:text-primary-600 transition-colors font-medium relative group">
-              Home
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary-500 transition-all group-hover:w-full"></span>
+          <nav className="hidden md:flex items-center space-x-8 font-poppins text-base">
+          {[
+            { href: "/", label: "Home" },
+            { href: "/product/products", label: "Products" },
+            { href: "/categories", label: "Categories" },
+            { href: "/about", label: "About" },
+            { href: "/orders/orders-page", label: "Your Orders" },
+          ].map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="relative group font-medium transition-all duration-300 ease-in-out"
+            >
+              <span className="text-gray-400 group-hover:text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-300">
+                {label}
+              </span>
+              <span
+                className="absolute left-0 -bottom-1 h-0.5 w-full scale-x-0 group-hover:scale-x-100 
+                origin-left transition-transform bg-gradient-to-r from-orange-500 to-amber-400 duration-300"
+              ></span>
             </Link>
-            <Link href="/products" className="text-dark-600 hover:text-primary-600 transition-colors font-medium relative group">
-              Products
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary-500 transition-all group-hover:w-full"></span>
-            </Link>
-            <Link href="/categories" className="text-dark-600 hover:text-primary-600 transition-colors font-medium relative group">
-              Categories
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary-500 transition-all group-hover:w-full"></span>
-            </Link>
-            <Link href="/about" className="text-dark-600 hover:text-primary-600 transition-colors font-medium relative group">
-              About
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary-500 transition-all group-hover:w-full"></span>
-            </Link>
-          </nav>
+          ))}
+        </nav>
+
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-4">
             <motion.button 
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              className="p-2 text-dark-600 hover:text-primary-600 transition-colors rounded-lg hover:bg-primary-50"
+              className="p-2 text-gray-400 hover:text-amber-400 transition-colors rounded-lg hover:bg-primary-50"
             >
               <Search size={20} />
             </motion.button>
             <motion.button 
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              className="p-2 text-dark-600 hover:text-primary-600 transition-colors rounded-lg hover:bg-primary-50"
+              className="p-2 text-gray-400 hover:text-amber-400 transition-colors rounded-lg hover:bg-primary-50"
             >
               <User size={20} />
             </motion.button>
-            <Link href="/cart" className="relative p-2 text-dark-600 hover:text-primary-600 transition-colors rounded-lg hover:bg-primary-50">
+            <Link href="/cart" className="relative p-2 text-gray-400 hover:text-amber-400 transition-colors rounded-lg hover:bg-primary-50">
               <ShoppingBag size={20} />
               {totalItems > 0 && (
                 <motion.span
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 bg-gradient-to-r from-primary-500 to-primary-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse"
+                  className="absolute -top-1 -right-1 bg-gradient-to-r from-amber-500 to-orange-600 text-black text-xs rounded-full w-5 h-5 flex items-center justify-center"
                 >
                   {totalItems}
                 </motion.span>
@@ -81,7 +87,7 @@ const Header: React.FC = () => {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 text-dark-600 hover:text-primary-600 transition-colors"
+            className="md:hidden p-2 text-gray-400 hover:text-primary-600 transition-colors"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -107,7 +113,7 @@ const Header: React.FC = () => {
                 Home
               </Link>
               <Link
-                href="/products"
+                href="/product/products"
                 className="block text-dark-600 hover:text-primary-600 transition-colors font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >

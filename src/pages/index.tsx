@@ -1,12 +1,12 @@
 import "../styles/globals.css";
 import AuthPage from "./auth";
-import Hero from "./hero";
+import Landing from "./landing";
 const Home = () => {
   
   return (
    <>
       <div className="bg-primary text-primary">
-         <Hero/>
+         <Landing/>
       </div>
       
    </>

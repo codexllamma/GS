@@ -4,7 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useCartStore } from "@/store/useCartStore";
-import Hero from "./hero";
+import Hero from "./landing";
 
 function AuthGate() {
   const { data: session, status } = useSession();
