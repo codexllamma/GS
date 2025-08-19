@@ -33,6 +33,7 @@ export default function ProductForm({
     category: initialData?.category || "",
     stock: initialData?.stock || 0,
   });
+
   const [uploading, setUploading] = useState(false);
 
 
@@ -66,7 +67,7 @@ export default function ProductForm({
         alert("Upload failed.");
         return;
       }
-
+      
       const { data } = supabase.storage
         .from("images")
         .getPublicUrl(filePath);
@@ -88,6 +89,7 @@ export default function ProductForm({
     onSubmit(form);
   };
 
+  
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-4 border rounded-lg max-w-md mx-auto">
       <input

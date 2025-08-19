@@ -87,11 +87,12 @@ model Product {
   description String
   price       Int
   image       String
-  category    String
+  category    Category?
   stock       Int
   createdAt   DateTime    @default(now())
   cartOrders  CartOrder[]
   orderItems  OrderItem[]
+  isDeleted   Boolean     @default(false)
 }
 
 model CartOrder {
@@ -108,6 +109,15 @@ enum PaymentMethod {
   COD
   RAZORPAY
   STRIPE
+}
+
+enum Category{
+  HOODIE
+  TRACKS
+  JEANS
+  TSHIRTS
+  SHIRTS
+  TROUSERS
 }
 
 enum Status {

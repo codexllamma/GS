@@ -11,6 +11,7 @@ const CartPage: React.FC = () => {
   const items = cart.reduce((sum, item) => sum + item.quantity, 0);
   const total = cart.reduce((sum, item) => sum + item.quantity * item.product.price, 0);
   const [isLoaded, setIsLoaded] = useState(false);
+  
 
 useEffect(() => {
   fetchCart().then(() => setIsLoaded(true));
@@ -27,7 +28,7 @@ useEffect(() => {
           <ShoppingBag size={64} className="mx-auto text-gray-400 mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
           <p className="text-gray-600 mb-6">Start shopping to add items to your cart</p>
-          <Link href="/products">
+          <Link href="/product/products">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -95,7 +96,7 @@ useEffect(() => {
                     <div className="flex items-center space-x-3">
                       <div className="flex items-center border border-gray-300 rounded-lg">
                         <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           className="p-2 hover:bg-gray-100 transition-colors"
                         >
                           <Minus color='gray' size={16} />
@@ -104,7 +105,7 @@ useEffect(() => {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           className="p-2 hover:bg-gray-100 transition-colors"
                         >
                           <Plus color='gray' size={16} />

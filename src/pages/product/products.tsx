@@ -3,6 +3,7 @@ import Head from "next/head";
 import { useSession } from "next-auth/react";
 import { useCartStore } from "@/store/useCartStore";
 import ProductCard from "@/components/productCard";
+import Header from "@/components/header";
 
 export interface Product {
   id: string;
@@ -88,6 +89,7 @@ export default function ProductsPage() {
 
   return (
     <>
+      <Header/>
       <Head>
         <title>Products | YourStore</title>
         <meta name="description" content="Browse our products" />

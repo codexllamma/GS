@@ -2,10 +2,11 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import prisma from "@/lib/prisma";
+import { useState } from "react";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
-  
+  const [error, setError] = useState();
 
   if (!session?.user?.id) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -54,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    if (req.method === "PUT") {
+  if (req.method === "PUT") {
   const { cartOrderId, quantity } = req.body;
   if (!cartOrderId || quantity == null) {
     return res.status(400).json({ message: "cartOrderId and quantity are required" });
@@ -66,7 +67,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { id: cartOrderId },
       include: { product: true },
     });
-
+    
+    console.log("Incoming cartOrderId:", cartOrderId);
     if (!cartOrder) {
       return res.status(404).json({ message: "Cart item not found." });
     }

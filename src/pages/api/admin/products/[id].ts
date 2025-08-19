@@ -32,10 +32,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === "DELETE") {
     try {
-      await prisma.product.delete({ where: { id } });
+      await prisma.product.update({ where: { id } , data: { isDeleted:  true },});
       res.status(200).json({ message: "Product deleted successfully." });
     } catch (error) {
       console.error(error);
+      console.error("Delete error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       res.status(500).json({ message: "Failed to delete product." });
     }
   } else {
