@@ -1,5 +1,4 @@
-import "../styles/globals.css";
-import AuthPage from "./auth";
+
 import Landing from "./landing";
 const Home = () => {
   

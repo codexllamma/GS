@@ -74,6 +74,7 @@ export default function ProductsPage() {
 
       if (!res.ok) {
         setError(data.message || "Failed to add to cart.");
+        console.log(error);
         return;
       }
 

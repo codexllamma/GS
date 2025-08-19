@@ -98,7 +98,8 @@ export default function CheckoutPage() {
           onChange={(e) => setPaymentMethod(e.target.value)}
         >
           <option value="COD">Cash on Delivery</option>
-          <option value="ONLINE">Online Payment</option>
+          <option value="RAZORPAY">UPI</option>
+          <option value="STRIPE">Credit Card</option>
         </select>
       </div>
 
