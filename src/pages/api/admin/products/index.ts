@@ -20,11 +20,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(500).json({ message: "Failed to fetch products." });
     }
   } else if (req.method === "POST") {
+    console.log("req.body:", req.body);
     const { name, description, price, image, category, stock } = req.body;
     if (!name || !description || !price || !image || !category || !stock) {
       return res.status(400).json({ message: "All fields are required." });
     }
     try {
+      
+
       const product = await prisma.product.create({
         data: { name, description, price, image, category, stock },
       });

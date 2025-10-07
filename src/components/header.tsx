@@ -15,7 +15,7 @@ const Header: React.FC = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           
-          <Link href="/" className="flex items-center space-x-2 py-5">
+          <Link href="/dashboard" className="flex items-center space-x-2 py-5">
           <div className='  flex justify-center'>
 
             <motion.div
@@ -32,7 +32,7 @@ const Header: React.FC = () => {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8 font-poppins text-base">
           {[
-            { href: "/", label: "Home" },
+            { href: "/dashboard", label: "Home" },
             { href: "/product/products", label: "Products" },
             { href: "/categories", label: "Categories" },
             { href: "/about", label: "About" },

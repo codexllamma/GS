@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Category } from "@/generated/prisma";
+
+
 interface ProductFormProps {
   initialData?: {
     name: string;
@@ -35,9 +38,9 @@ export default function ProductForm({
   });
 
   const [uploading, setUploading] = useState(false);
+  const categories = Object.values(Category);
 
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({
       ...prev,
@@ -139,15 +142,21 @@ export default function ProductForm({
         />
       )}
 
-      <input
-        type="text"
+      <select
         name="category"
         value={form.category}
         onChange={handleChange}
-        placeholder="Category"
         className="border p-2 w-full rounded"
         required
-      />
+      >
+        <option value="">Select category</option>
+        {categories.map(cat => (
+          <option key={cat} value={cat}>
+            {cat}
+          </option>
+        ))}
+      </select>
+
       <input
         type="number"
         name="stock"

@@ -32,6 +32,7 @@ model Order {
   address        String
   status         Status
   paymentMethod  PaymentMethod
+  isPaid         Boolean       @default(false)
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderItems     OrderItem[]
 }
@@ -108,7 +109,6 @@ model CartOrder {
 enum PaymentMethod {
   COD
   RAZORPAY
-  STRIPE
 }
 
 enum Category{

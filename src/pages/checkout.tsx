@@ -4,6 +4,10 @@ import { useRouter } from "next/router";
 
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
+
+  if (status !== "authenticated" || !session?.user) {
+    return <p>Please log in to continue checkout.</p>;
+  }
   const router = useRouter();
 
   const [cartItems, setCartItems] = useState<any[]>([]);
@@ -11,7 +15,18 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [loading, setLoading] = useState(true);
 
+  const loadRazorpay = (): Promise<void> =>
+    new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve();
+      document.body.appendChild(script);
+    });
+    
   useEffect(() => {
+    
+    
+    
     const fetchCart = async () => {
       if (status !== "authenticated") return;
       try {
@@ -39,8 +54,10 @@ export default function CheckoutPage() {
     fetchCart();
     fetchUserAddress();
   }, [status]);
-
+  
+   
   const handleCheckout = async () => {
+    
     if (!address.trim()) {
       alert("Please enter a valid address.");
       return;
@@ -49,24 +66,58 @@ export default function CheckoutPage() {
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          address,
-          paymentMethod,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address, paymentMethod }),
       });
 
       if (!res.ok) throw new Error("Checkout failed");
 
-      const order = await res.json();
-      router.push(`/order-confirmation/${order.id}`);
+      const data = await res.json();
+      const order = data.order;
+
+      
+      if (paymentMethod === "RAZORPAY") {
+        await loadRazorpay();
+        const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+          amount: data.razorpayOrder.amount,
+          currency: data.razorpayOrder.currency,
+          name: "Your Shop Name",
+          description: "Order Payment",
+          order_id: data.razorpayOrder.id,
+          handler: async (response: any) => {
+            await fetch("/api/razorpay/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: order.id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpaySignature: response.razorpay_signature,
+              }),
+            });
+
+            router.push(`/order-confirmation/${order.id}`);
+          },
+          prefill: {
+            name: session.user?.name,
+            email: session.user?.email,
+            contact: "", // optional
+          },
+          theme: { color: "#F37254" },
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      } else {
+        router.push(`/order-confirmation/${order.id}`);
+      }
     } catch (err) {
       console.error(err);
       alert("Checkout failed.");
     }
   };
+
   
   if (loading) return <p>Loading checkout...</p>;
 
@@ -98,8 +149,7 @@ export default function CheckoutPage() {
           onChange={(e) => setPaymentMethod(e.target.value)}
         >
           <option value="COD">Cash on Delivery</option>
-          <option value="RAZORPAY">UPI</option>
-          <option value="STRIPE">Credit Card</option>
+          <option value="RAZORPAY">Online</option>
         </select>
       </div>
 
@@ -139,6 +189,7 @@ export default function CheckoutPage() {
       </div>
 
       <button
+        type="button"
         className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
         onClick={handleCheckout}
       >

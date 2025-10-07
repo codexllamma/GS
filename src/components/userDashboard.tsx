@@ -14,7 +14,6 @@ const UserDashboard = () => {
      <>
      <Header/>
      <Hero/>
-     {/*<ProductsPage />*/}
      </>
   ) 
 }
