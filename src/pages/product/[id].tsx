@@ -1,343 +1,268 @@
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft,Heart, Star,Check } from "lucide-react";
-import { Product } from "@/generated/prisma";
-import { motion, AnimatePresence } from 'framer-motion';
-
-export default function ProductPage() {
-  const router = useRouter();
-  const { id } = router.query;
-  const [product, setProduct] = useState<any>(null);
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [quantity, setQuantity] = useState(1);
-  
-
-  useEffect(() => {
-    if (!id) return;
-    const fetchProduct = async () => {
-      const res = await fetch(`/api/product/${id}`);
-      const data = await res.json();
-      setProduct(data);
-    };
-    fetchProduct();
-  }, [id]);
-
-  if (!product) {
-    return <div>Loading...</div>;
-  }
-
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-8 transition-colors"
-        >
-          <ArrowLeft size={20} className="mr-2" />
-          Back to products
-        </Link>
-
-        <div className="grid lg:grid-cols-2 gap-12">
-          {/* Product Images */}
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-4">
-              <img
-                src={product.images[selectedImage]}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {/*
-            {product.images.length > 1 && (
-              <div className="flex space-x-2">
-                {product.images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedImage(index)}
-                    className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedImage === index ? 'border-blue-600' : 'border-gray-200'
-                    }`}
-                  >
-                    <img src={image} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-             */}
-            
-          </motion.div>
-
-          {/* Product Info */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="space-y-6"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-blue-600 font-medium">{product.category}</span>
-                <button className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-                  <Heart size={24} />
-                </button>
-              </div>
-              
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{product.name}</h1>
-              
-              <div className="flex items-center mb-4">
-                <div className="flex items-center">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-5 h-5 ${
-                        i < Math.floor(product.rating)
-                          ? 'fill-amber-400 text-amber-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  ))}
-                  <span className="ml-2 text-gray-600">{product.rating}</span>
-                </div>
-                <span className="ml-4 text-gray-500">({product.reviews} reviews)</span>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <span className="text-3xl font-bold text-gray-900">${product.price}</span>
-              {product.originalPrice && (
-                <span className="text-xl text-gray-500 line-through">${product.originalPrice}</span>
-              )}
-            </div>
-
-            <p className="text-gray-600 leading-relaxed">{product.description}</p>
-
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <span className="font-medium text-gray-900">Quantity:</span>
-                <div className="flex items-center border border-gray-300 rounded-lg">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-2 hover:bg-gray-100 transition-colors"
-                  >
-                    -
-                  </button>
-                  <span className="px-4 py-2 border-x border-gray-300">{quantity}</span>
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="p-2 hover:bg-gray-100 transition-colors"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center text-green-600">
-                <Check size={20} className="mr-2" />
-                <span>{product.inStock ? 'In Stock' : 'Out of Stock'}</span>
-              </div>
-            </div>
-
-            
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  );
-    
-    
+// /pages/product/[id].tsx
+import Image from "next/image";
+import { GetServerSideProps, GetServerSidePropsContext, InferGetServerSidePropsType } from "next";
+import { ShoppingBag } from "lucide-react";
+import { useState } from "react";
+import prisma from "@/lib/prisma";
+import { AnimatePresence,motion } from "framer-motion";
+interface ProductImage {
+  url: string;
+  isPrimary: boolean;
 }
-{/*
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Star, ShoppingCart, Heart, ArrowLeft, Check } from 'lucide-react';
-import { products } from '../data/products';
-import { useCart } from '../context/CartContext';
-import { motion } from 'framer-motion';
 
-const ProductDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const { addToCart } = useCart();
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [quantity, setQuantity] = useState(1);
-  const [addedToCart, setAddedToCart] = useState(false);
+interface ProductVariant {
+  size: string;
+  price: number;
+  stock: number;
+}
 
-  const product = products.find(p => p.id === id);
+interface Fabric {
+  name: string;
+  category: { name: string };
+}
 
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  basePrice: number;
+  color: string;
+  fabric: Fabric;
+  images: ProductImage[];
+  variants: ProductVariant[];
+  createdAt: string;
+}
+
+export const getServerSideProps: GetServerSideProps<{ product: Product | null }> = async (
+  context: GetServerSidePropsContext
+) => {
+  const { params } = context;
+  const id = params?.id as string;
+
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        fabric: { include: { category: true } },
+        variants: true,
+        images: true,
+      },
+    });
+
+    if (!product) {
+      return { notFound: true };
+    }
+
+    return {
+      props: { product: JSON.parse(JSON.stringify(product)) },
+    };
+  } catch (error) {
+    console.error("Product fetch error:", error);
+    return { notFound: true };
+  }
+};
+
+
+export default function ProductDetailsPage({
+  product,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [currentImage, setCurrentImage] = useState(0);       
+  const [added, setAdded] = useState(false);                 
+  
   if (!product) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Product not found</h2>
-          <Link to="/products" className="text-blue-600 hover:text-blue-700">
-            Back to products
-          </Link>
-        </div>
+      <div className="min-h-screen flex items-center justify-center text-gray-600">
+        Product not found.
       </div>
     );
   }
 
-
+  const handleAddToCart = () => {
+    if (!selectedSize) {
+      alert("Please choose a size");
+      return;
+    }
+  
+    setAdded(true);
+    // Temporary “added” animation
+    setTimeout(() => setAdded(false), 3000);
+  };
+  
+  const images = product.images ?? [];
+  const mainImage = images[0]?.url || "/placeholder.png";
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link
-          to="/products"
-          className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-8 transition-colors"
-        >
-          <ArrowLeft size={20} className="mr-2" />
-          Back to products
-        </Link>
-
-        <div className="grid lg:grid-cols-2 gap-12">
-          
-          
+    <main className="grid grid-cols-1 lg:grid-cols-[60%_40%] min-h-screen">
+      <section className="relative max-h-screen lg:sticky top-0 overflow-y-auto bg-neutral-50 flex justify-center items-start">
+        <AnimatePresence mode="wait">
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
+            key={images[currentImage]?.url}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+            className="absolute inset-0"
           >
-            <div className="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-4">
-              <img
-                src={product.images[selectedImage]}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
             
-            {product.images.length > 1 && (
-              <div className="flex space-x-2">
-                {product.images.map((image, index) => (
+            <Image
+              src={images[currentImage]?.url}
+              alt={product.name}
+              height={1000}
+              width={1500}
+              className="object-cover"
+            />
+            
+            
+            
+          </motion.div>
+        </AnimatePresence>
+  
+        <div className="fixed bottom-0 left-0 w-full h-32 bg-gradient-to-t from-neutral-50/90 to-transparent pointer-events-none" />
+            {images.length > 1 && (
+              <div className="fixed bottom-6 left-6 flex gap-3 z-20">
+                {images.map((img, i) => (
                   <button
-                    key={index}
-                    onClick={() => setSelectedImage(index)}
-                    className={`w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedImage === index ? 'border-blue-600' : 'border-gray-200'
+                    key={img.url}
+                    onClick={() => setCurrentImage(i)}
+                    className={`relative w-16 h-20 overflow-hidden rounded-md border ${
+                      currentImage === i ? "border-black" : "border-transparent"
                     }`}
                   >
-                    <img src={image} alt="" className="w-full h-full object-cover" />
+                    <Image
+                      src={img.url}
+                      alt={`Thumbnail ${i}`}
+                      fill
+                      className="object-cover opacity-80 hover:opacity-100"
+                    />
                   </button>
                 ))}
               </div>
             )}
-          </motion.div>
 
-          
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="space-y-6"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-blue-600 font-medium">{product.category}</span>
-                <button className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-                  <Heart size={24} />
-                </button>
-              </div>
-              
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{product.name}</h1>
-              
-              <div className="flex items-center mb-4">
-                <div className="flex items-center">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-5 h-5 ${
-                        i < Math.floor(product.rating)
-                          ? 'fill-amber-400 text-amber-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  ))}
-                  <span className="ml-2 text-gray-600">{product.rating}</span>
-                </div>
-                <span className="ml-4 text-gray-500">({product.reviews} reviews)</span>
-              </div>
-            </div>
 
-            <div className="flex items-center space-x-4">
-              <span className="text-3xl font-bold text-gray-900">${product.price}</span>
-              {product.originalPrice && (
-                <span className="text-xl text-gray-500 line-through">${product.originalPrice}</span>
-              )}
-            </div>
-
-            <p className="text-gray-600 leading-relaxed">{product.description}</p>
-
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <span className="font-medium text-gray-900">Quantity:</span>
-                <div className="flex items-center border border-gray-300 rounded-lg">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-2 hover:bg-gray-100 transition-colors"
-                  >
-                    -
-                  </button>
-                  <span className="px-4 py-2 border-x border-gray-300">{quantity}</span>
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="p-2 hover:bg-gray-100 transition-colors"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center text-green-600">
-                <Check size={20} className="mr-2" />
-                <span>{product.inStock ? 'In Stock' : 'Out of Stock'}</span>
-              </div>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              disabled={!product.inStock}
-              className={`w-full py-4 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all ${
-                product.inStock
-                  ? addedToCart
-                    ? 'bg-green-600 text-white'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              {addedToCart ? (
-                <>
-                  <Check size={20} />
-                  <span>Added to Cart!</span>
-                </>
-              ) : (
-                <>
-                  <ShoppingCart size={20} />
-                  <span>Add to Cart</span>
-                </>
-              )}
-            </motion.button>
-          </motion.div>
+        
+      </section>
+  
+      {/* RIGHT SECTION — DETAILS */}
+      <aside className="p-10 lg:p-16 flex flex-col justify-center space-y-10">
+        {/* Product Name + Price */}
+        <div>
+          <h1 className="text-4xl font-light tracking-tight">{product.name}</h1>
+          <p className="text-lg text-neutral-500 mt-1">
+            ₹{product.basePrice.toLocaleString()}
+          </p>
         </div>
-      </div>
-    </div>
-  );
-};
-/*
-/*
-<div className="max-w-xl mx-auto p-4">
-      {product.image && (
-        <img src={product.image} alt={product.name} className="w-full h-64 object-cover rounded mb-4" />
+  
+        {/* Color Options (Mock) */}
+        <div>
+          <h3 className="text-sm uppercase tracking-wide text-neutral-600 mb-3">
+            Color
+          </h3>
+          <div className="flex gap-3">
+            {["Black", "Green", "Ivory"].map((c) => (
+              <div
+                key={c}
+                className={`w-7 h-7 rounded-full border ${
+                  c === product.color ? "border-black" : "border-gray-300"
+                }`}
+                style={{
+                  backgroundColor:
+                    c === "Ivory" ? "#f4f4f1" : c.toLowerCase(),
+                }}
+              />
+            ))}
+          </div>
+        </div>
+  
+        {/* Size Selector */}
+        <div>
+          <h3 className="text-sm uppercase tracking-wide text-neutral-600 mb-3">
+            Select Size
+          </h3>
+          <div className="flex gap-3">
+            {product.variants?.map((v) => (
+              <button
+                key={v.size}
+                onClick={() => setSelectedSize(v.size)}
+                disabled={v.stock === 0}
+                className={`border px-5 py-2 text-sm rounded-md transition-all ${
+                  selectedSize === v.size
+                    ? "border-black bg-black text-white"
+                    : "border-gray-300 hover:border-black"
+                } ${v.stock === 0 ? "opacity-40 cursor-not-allowed" : ""}`}
+              >
+                {v.size}
+              </button>
+            ))}
+          </div>
+        </div>
+  
+        {/* Add to Bag Section */}
+        {/* Add to Bag Section (Animated) */}
+<div className="pt-6 border-t border-neutral-200">
+  <button
+    onClick={handleAddToCart}
+    disabled={!selectedSize}
+    className={`w-full px-6 py-4 rounded-full border transition-colors duration-300 overflow-hidden relative ${
+      !selectedSize
+        ? "border-neutral-300 text-neutral-400"
+        : added
+        ? "border-black bg-black text-white"
+        : "border-black hover:bg-black hover:text-white"
+    }`}
+  >
+    <AnimatePresence mode="wait">
+      {!added ? (
+        <motion.div
+          key="not-added"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.25 }}
+          className="flex items-center justify-between"
+        >
+          <span className="flex items-center gap-2 text-sm tracking-wide">
+            <ShoppingBag size={18} />
+            {selectedSize ? "Add to Bag" : "Select a size"}
+          </span>
+          <span className="text-sm font-light">
+            ₹{product.basePrice.toLocaleString()}
+          </span>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="added"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.25 }}
+          className="w-full text-center text-sm text-white"
+        >
+          Size {selectedSize} added ✓ —{" "}
+          <a href="/checkout" className="underline">
+            Checkout
+          </a>
+        </motion.div>
       )}
-      <h1 className="text-2xl font-bold mb-2">{product.name}</h1>
-      <p className="text-gray-600 mb-4">{product.description}</p>
-      <p className="text-lg font-semibold mb-2">₹{product.price}</p>
-      <p className="text-sm text-gray-500">Category: {product.category}</p>
-      <p className="text-sm text-gray-500">Stock: {product.stock}</p>
-    </div>
+    </AnimatePresence>
+  </button>
+</div>
+
+  
+        {/* Terms + Description */}
+        <div className="border-t border-neutral-200 pt-6 text-xs text-neutral-500 leading-relaxed">
+          By making this payment, you accept the{" "}
+          <a href="#" className="underline hover:text-black">
+            Terms of Sale
+          </a>{" "}
+          and confirm that you have read our{" "}
+          <a href="#" className="underline hover:text-black">
+            Privacy Policy
+          </a>
+          .
+        </div>
+      </aside>
+    </main>
   );
-  */}
+}
