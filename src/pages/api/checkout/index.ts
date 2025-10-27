@@ -1,121 +1,163 @@
-
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import prisma from "@/lib/prisma";
 import Razorpay from "razorpay";
 
+// Initialize Razorpay
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 });
 
-
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
   try {
-    
     const session = await getServerSession(req, res, authOptions);
-    console.log("Checkout request body:", req.body);
-
     if (!session?.user?.id) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
     const userId = session.user.id;
-    
-
     const { address, paymentMethod } = req.body;
 
     if (!address || !paymentMethod) {
-      return res.status(400).json({ message: "Address and payment method are required" });
+      return res
+        .status(400)
+        .json({ message: "Address and payment method are required" });
     }
 
-    // Update user address if missing
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.address) {
-      await prisma.user.update({ where: { id: userId }, data: { address } });
-    }
-
-    // Fetch cart
-    const cartItems = await prisma.cartOrder.findMany({
-      where: { userId },
-      include: { product: true },
+    let existingAddress = await prisma.address.findFirst({
+      where: {
+        userId,
+        line1: address.line1,
+        city: address.city,
+        postal: address.postal,
+      },
     });
-    console.log("Checkout → userId from session:", userId);
-    console.log("Checkout → fetched cart items:", cartItems);
-    if (cartItems.length === 0) {
+
+    if (!existingAddress) {
+      existingAddress = await prisma.address.create({
+        data: {
+          userId,
+          line1: address.line1,
+          line2: address.line2 || null,
+          city: address.city,
+          state: address.state,
+          postal: address.postal,
+          country: address.country,
+          isDefault: true,
+        },
+      });
+    }
+
+    // ✅ 2. Fetch user's cart
+    const cart = await prisma.cart.findFirst({
+      where: { userId },
+      include: {
+        items: {
+          include: {
+            variant: {
+              include: {
+                product: {
+                  include: { images: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!cart || cart.items.length === 0) {
       return res.status(400).json({ message: "Cart is empty" });
     }
 
-    // Pricing
-    const subtotal = cartItems.reduce(
-      (sum, item) => sum + item.product.price * item.quantity,
+    // ✅ 3. Calculate totals
+    const subtotal = cart.items.reduce(
+      (sum, item) =>
+        sum +
+        item.quantity *
+          (item.variant.price ?? item.variant.product.basePrice ?? 0),
       0
     );
     const deliveryCharge = subtotal > 1000 ? 0 : 50;
     const total = subtotal + deliveryCharge;
 
-    console.log("Cart Items:", cartItems);
-    console.log("Subtotal:", subtotal, "Total:", total);
-    console.log("Creating order...");
+    console.log("Checkout → Subtotal:", subtotal, "Total:", total);
 
-    // Create order in DB
+    // ✅ 4. Create order
     const order = await prisma.order.create({
       data: {
         userId,
-        address,
+        addressId: existingAddress.id, // 👈 foreign key fix
         paymentMethod,
         subtotal,
-        isPaid: false,
         deliveryCharge,
-        status: "PENDING",
         total,
+        isPaid: false,
+        status: "PENDING",
         orderItems: {
-          create: cartItems.map((item) => ({
-            productId: item.productId,
+          create: cart.items.map((item) => ({
+            variantId: item.variantId,
             quantity: item.quantity,
-            priceAtPurchase: item.product.price,
+            priceAtPurchase:
+              item.variant.price ?? item.variant.product.basePrice ?? 0,
+            productId: item.variant.product.id,
           })),
         },
       },
       include: {
-        orderItems: { include: { product: true } },
+        orderItems: {
+          include: { variant: { include: { product: true } } },
+        },
       },
     });
 
-    // Clear cart
-    await prisma.cartOrder.deleteMany({ where: { userId } });
+    // ✅ 5. Clear cart
+    await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-    // Handle payments
+    // ✅ 6. Handle payment flow
     if (paymentMethod === "RAZORPAY") {
-
       const razorpayOrder = await razorpay.orders.create({
-        amount: total * 100, // in paise
+        amount: total * 100, // paise
         currency: "INR",
         receipt: `order_rcpt_${order.id.slice(0, 20)}`,
+        notes: {
+          userId,
+          internalOrderId: order.id,
+        },
       });
 
       return res.status(201).json({
         order,
         razorpayOrder,
-        message: "Proceed to online payment",
+        message: "Proceed to Razorpay payment",
       });
     }
 
-    // COD fallback
-    return res.status(201).json({
-      order,
-      message: "COD order placed successfully",
+    // ✅ 7. COD fallback
+    const codOrder = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: "PROCESSING",
+        isPaid: true,
+      },
     });
-  } catch (error) {
-    console.error("Checkout Error:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+
+    return res.status(201).json({
+      order: codOrder,
+      message: "Cash on Delivery order placed successfully",
+    });
+  } catch (error: any) {
+    console.error("Checkout API error:", error);
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 }

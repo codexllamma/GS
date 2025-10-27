@@ -12,16 +12,9 @@ export default function ProductsPage() {
 
       <Header />
 
-      <main className="max-w-9xl mx-auto px-4 py-12">
-        <section className="flex flex-col items-start justify-center">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-8">
-            Our Products
-          </h1>
-
           {/* Product grid section */}
           <ProductsGrid />
-        </section>
-      </main>
+        
     </>
   );
 }

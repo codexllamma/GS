@@ -1,81 +1,134 @@
 import { create } from "zustand";
-import { Product } from "@/generated/prisma";
+import { Product, ProductVariant } from "@/generated/prisma";
+import { CartItem } from "@/types/cart";
 
-type CartItem = {
-  id: string; // cartOrderId
-  quantity: number;
-  product: Product;
-};
+// --- Types ---
+export interface CartVariant extends ProductVariant {
+  product: Product & {
+    images: { url: string }[];
+  };
+}
 
 interface CartStore {
   cart: CartItem[];
   fetchCart: () => Promise<void>;
-  addToCart: (productId: string, quantity?: number) => Promise<void>;
-  removeFromCart: (cartOrderId: string) => Promise<void>;
-  updateQuantity: (cartOrderId: string, quantity: number) => Promise<void>;
-  clearCart: () => void; // Optional: Clear local only
+  addToCart: (variantId: string, quantity?: number) => Promise<void>;
+  removeFromCart: (cartItemId: string) => Promise<void>;
+  updateQuantity: (cartItemId: string, quantity: number) => Promise<void>;
+  updateVariant: (cartItemId: string, variantId: string) => Promise<void>;
+  clearCart: () => void;
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
   cart: [],
+
   
-
   fetchCart: async () => {
-    const res = await fetch("/api/cart");
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/cart");
+      if (!res.ok) throw new Error("Failed to fetch cart");
+
       const data = await res.json();
-      set({ cart: data });
-    } else {
-      console.error("Failed to fetch cart");
-    }
-  },
 
-  addToCart: async (productId, quantity = 1) => {
-    const res = await fetch("/api/cart", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId, quantity }),
-    });
-    if (res.ok) {
-      const newItem = await res.json();
-      await get().fetchCart(); // Refresh state from server
-    } else {
-      console.error("Failed to add to cart");
-    }
-  },
-
-  removeFromCart: async (cartOrderId) => {
-    const res = await fetch("/api/cart", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cartOrderId }),
-    });
-    if (res.ok) {
-      set((state) => ({
-        cart: state.cart.filter((item) => item.id !== cartOrderId),
+      // Normalize backend shape
+      const normalized = (data?.items || []).map((it: any) => ({
+        id: it.id,
+        quantity: it.quantity,
+        variant: it.variant,
       }));
-    } else {
-      console.error("Failed to remove item");
+
+      set({ cart: normalized });
+    } catch (err) {
+      console.error("Fetch cart failed:", err);
     }
   },
 
-  updateQuantity: async (cartOrderId, quantity) => {
-    const res = await fetch("/api/cart", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cartOrderId, quantity }),
-    });
-    if (res.ok) {
+  
+  addToCart: async (variantId, quantity = 1) => {
+    try {
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ variantId, quantity }),
+      });
+
+      if (!res.ok) throw new Error("Failed to add to cart");
+
+      await get().fetchCart(); // re-fetch latest state
+    } catch (err) {
+      console.error("Add to cart failed:", err);
+    }
+  },
+
+  // 🧩 REMOVE ITEM
+  removeFromCart: async (cartItemId) => {
+    try {
+      const res = await fetch("/api/cart", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartItemId }),
+      });
+
+      if (!res.ok) throw new Error("Failed to remove from cart");
+
+      set((state) => ({
+        cart: state.cart.filter((item) => item.id !== cartItemId),
+      }));
+    } catch (err) {
+      console.error("Remove from cart failed:", err);
+    }
+  },
+
+  // 🧩 UPDATE QUANTITY
+  updateQuantity: async (cartItemId, quantity) => {
+    try {
+      const res = await fetch("/api/cart", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartItemId, quantity }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update quantity");
+
       const updatedItem = await res.json();
+
       set((state) => ({
         cart: state.cart.map((item) =>
-          item.id === updatedItem.id ? { ...item, quantity: updatedItem.quantity } : item
+          item.id === updatedItem.id
+            ? { ...item, quantity: updatedItem.quantity }
+            : item
         ),
       }));
-    } else {
-      console.error("Failed to update quantity");
+    } catch (err) {
+      console.error("Update quantity failed:", err);
     }
   },
 
-  clearCart: () => set({ cart: [] }), // Optional: For UI reset
+  clearCart: () => set({ cart: [] }),
+  
+  updateVariant: async (cartItemId, variantId) => {
+    try {
+      const res = await fetch("/api/cart", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartItemId, variantId }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update variant");
+
+      const updatedItem = await res.json();
+
+      set((state) => ({
+        cart: state.cart.map((item) =>
+          item.id === cartItemId ? updatedItem : item
+        ),
+      }));
+    } catch (err) {
+      console.error("Update variant failed:", err);
+    }
+  },
+
+
+
 }));
+
