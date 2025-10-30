@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, User, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Chrome } from "lucide-react";
 
 export default function AuthPage() {
   const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(false);
   const [form, setForm] = useState({ email: "", password: "", name: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,37 +19,46 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    if (isSignUp) {
-      const res = await fetch("/api/auth/signup", {
-        method: "POST",
-        body: JSON.stringify(form),
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json();
+    try {
+      
+      if (isSignUp) {
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
 
-      if (!res.ok) {
-        setError(data.message || "Signup Failed");
-        return;
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Signup failed");
       }
-    }
 
-    const res = await signIn("credentials", {
-      redirect: false,
-      email: form.email,
-      password: form.password,
-    });
+      
+      const res = await signIn("credentials", {
+        redirect: false,
+        email: form.email,
+        password: form.password,
+      });
 
-    if (res?.error) {
-      setError(res.error);
-    } else {
+      if (res?.error) throw new Error(res.error);
+
       router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    await signIn("google", { callbackUrl: "/dashboard" });
   };
 
   return (
     <div className="min-h-screen rounded-[2.5rem] bg-gradient-to-br from-amber-100/50 via-white/40 to-orange-200/50 flex items-center justify-center p-4 relative overflow-hidden backdrop-blur-[8px] border border-white/20 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
-
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
@@ -77,14 +87,13 @@ export default function AuthPage() {
         >
           {/* GS Logo */}
           <div className="flex justify-center">
-
-          <motion.div
-            animate={{ rotate: [0, 5, -5, 0] }}
-            transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
-            className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 rounded-2xl mb-4 shadow-lg mx-auto"
-          >
-            <span className="text-white font-bold text-xl tracking-wider">GS</span>
-          </motion.div>
+            <motion.div
+              animate={{ rotate: [0, 5, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+              className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 rounded-2xl mb-4 shadow-lg mx-auto"
+            >
+              <span className="text-white font-bold text-xl tracking-wider">GS</span>
+            </motion.div>
           </div>
 
           {/* Header Text */}
@@ -146,6 +155,7 @@ export default function AuthPage() {
                 placeholder="Email Address"
                 value={form.email}
                 onChange={handleChange}
+                required
                 className="w-full pl-12 pr-4 py-4 text-gray-800 bg-gray-50/50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-300 placeholder-gray-500"
               />
             </motion.div>
@@ -160,6 +170,7 @@ export default function AuthPage() {
                 placeholder="Password"
                 value={form.password}
                 onChange={handleChange}
+                required
                 className="w-full pl-12 pr-12 py-4 text-gray-800 bg-gray-50/50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-300 placeholder-gray-500"
               />
               <button
@@ -167,7 +178,11 @@ export default function AuthPage() {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-4 flex items-center"
               >
-                {showPassword ? <EyeOff className="h-5 w-5 text-gray-500" /> : <Eye className="h-5 w-5 text-gray-500" />}
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5 text-gray-500" />
+                ) : (
+                  <Eye className="h-5 w-5 text-gray-500" />
+                )}
               </button>
             </motion.div>
 
@@ -176,13 +191,12 @@ export default function AuthPage() {
               type="submit"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              disabled={loading}
               className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group relative overflow-hidden"
             >
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-amber-400 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-              />
+              <motion.div className="absolute inset-0 bg-gradient-to-r from-amber-400 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <span className="relative flex items-center">
-                {isSignUp ? "Create Account" : "Sign In"}
+                {loading ? "Processing..." : isSignUp ? "Create Account" : "Sign In"}
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </span>
             </motion.button>
@@ -201,6 +215,17 @@ export default function AuthPage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Google Sign In */}
+          <div className="mt-8 flex flex-col items-center">
+            <button
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 border border-gray-300 py-3 rounded-2xl text-gray-700 hover:bg-gray-50 transition-all duration-300 font-medium"
+            >
+              <Chrome className="h-5 w-5" /> Sign in with Google
+            </button>
+          </div>
 
           {/* Toggle */}
           <div className="mt-8 text-center">
