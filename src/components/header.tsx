@@ -10,7 +10,7 @@ const Header: React.FC = () => {
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <header className="sticky top-0 z-50 glass-effect bg-[#0f172a] border-b border-primary-100/50">
+    <header className="sticky top-0 z-50 glass-effect bg-white border-b border-primary-100/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}

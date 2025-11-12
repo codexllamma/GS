@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
 import { useState } from "react";
 import Image from "next/image";
-import { ShoppingBag, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShoppingBag, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -21,10 +21,10 @@ interface ProductCardProps {
   onAddToCart?: (id: string) => void;
 }
 
-export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
+export default function ProductCard({ product }: ProductCardProps) {
   const [currentImage, setCurrentImage] = useState(0);
-  const images = product.images || [];
   const [direction, setDirection] = useState(1);
+  const images = product.images || [];
 
   const handleNext = () => {
     setDirection(1);
@@ -37,20 +37,24 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
   };
 
   return (
-    <div className="group relative flex flex-col cursor-pointer transition-all duration-500 hover:scale-[1.005]">
-      
-      {/* Product Image Carousel */}
-      <div className="relative w-[350px] h-[500px] aspect-[10/11] overflow-hidden rounded-xl bg-gray-50">
+    <div className="group relative flex flex-col cursor-pointer transition-transform duration-500 hover:scale-[1.005]">
+      {/* Clickable Image */}
+      <Link
+      href={`/product/${product.id}`}
+      className="relative block w-full aspect-[3/5] sm:aspect-[4/5] md:aspect-[10/12]
+        overflow-hidden bg-neutral-100 border border-neutral-200 cursor-pointer"
+      >
+
         <AnimatePresence mode="wait">
           <motion.div
             key={images[currentImage]?.url}
-            initial={{ opacity: 0, x: direction === 1 ? 15 : -15 }}
+            initial={{ opacity: 0, x: direction === 1 ? 20 : -20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction === 1 ? 15 : -15 }}
+            exit={{ opacity: 0, x: direction === 1 ? 20 : -20 }}
             transition={{
-              duration: 0.7,
-              ease: [0.25, 0.1, 0.05, 0.1],
-              opacity: { duration: 0.35, ease: "easeInOut" },
+              duration: 0.6,
+              ease: "easeInOut",
+              opacity: { duration: 0.3 },
             }}
             className="absolute inset-0"
           >
@@ -58,64 +62,53 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
               src={images[currentImage]?.url}
               alt={product.name}
               fill
-              className="object-cover transition-transform duration-650 group-hover:scale-[1.005]"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+              className="object-cover transition-all duration-700 group-hover:scale-[1.02] group-hover:brightness-[1.05]"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             />
           </motion.div>
         </AnimatePresence>
 
-        {/* Image navigation */}
+        {/* Navigation */}
         {images.length > 1 && (
           <>
             <button
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 handlePrev();
               }}
-              className="absolute left-3 top-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 hover:bg-neutral-300 group-hover:opacity-70 group-hover:translate-y-[-50%] transition-all duration-300 ease-out text-black rounded-full p-1.5"
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 text-black opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white transition-all rounded-sm"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={14} />
             </button>
             <button
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 handleNext();
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2  opacity-0 hover:opacity-100 hover:bg-neutral-300 group-hover:opacity-70 group-hover:translate-y-[-50%] transition-all duration-300 ease-out text-black rounded-full p-1.5"
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 text-black opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white transition-all rounded-sm"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={14} />
             </button>
           </>
         )}
-      </div>
+      </Link>
 
       {/* Product Details */}
-      <div className="flex flex-col mt-4">
-        <h3 className="text-[1.05rem] font-medium tracking-tight">{product.name}</h3>
-
-        <div className="flex items-center justify-between mt-1 relative">
+      <div className="flex flex-col mt-3 px-1 select-none">
+        <h3 className="font-apercu text-[1.05rem] font-medium tracking-tight line-clamp-1 group-hover:text-black transition-colors duration-200">
+          {product.name}
+        </h3>
+        <div className="font-apercu flex items-center justify-between mt-1">
           <p className="text-[14px] text-gray-700">₹{product.basePrice}</p>
-
-          {/* Hidden until hover */}
-          <div className="flex items-center justify-center gap-3 absolute bottom-0.5 right-0 -translate-y-1/12 opacity-0 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:translate-y-0.5">
-            
-            {/* Add to Bag — temporary redirect */}
-            <Link
-              href={`/product/${product.id}`}
-              className="flex items-center justify-center gap-2 border border-black text-black text-[14px] px-4.5 py-1.5 rounded-full hover:bg-black hover:text-white transition-all duration-300"
-            >
-              <ShoppingBag size={14} />
-              Add to Bag
-            </Link>
-
-            {/* Product details arrow */}
-            <Link
-              href={`/product/${product.id}`}
-              className="flex items-center justify-center border border-black rounded-full text-[12px] p-2.5 hover:bg-black hover:text-white transition-all duration-300"
-            >
-              <ArrowRight size={16} />
-            </Link>
-          </div>
+          <Link
+            href={`/product/${product.id}`}
+            className="flex items-center justify-center gap-1 border border-black text-black text-[13px] px-3 py-1 hover:bg-black hover:text-white transition-all duration-300"
+          >
+            <ShoppingBag size={13} />
+            <span >Add</span>
+          </Link>
         </div>
       </div>
     </div>

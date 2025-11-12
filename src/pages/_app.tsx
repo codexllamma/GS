@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useCartStore } from "@/store/useCartStore";
 import Hero from "./landing";
+import Footer from "@/components/footer";
+import { useRouter } from "next/router";
 
 function AuthGate() {
   const { data: session, status } = useSession();
@@ -21,12 +23,17 @@ function AuthGate() {
 
 
 export default function App({ Component, pageProps:{session, ...pageProps} }: AppProps) {
+  const router = useRouter();
+  const hideFooterRoutes = ["/auth", "/product", "/cart", "/checkout", "/order-confirmation"]; 
+  const shouldHideFooter = hideFooterRoutes.some((path) =>
+  router.pathname.startsWith(path) || router.asPath.startsWith(path));
 
   return (
     <SessionProvider session={session}>
       {/*<Hero/>*/}
       {/*<AuthGate/>*/}
       <Component {...pageProps} />
+       { !shouldHideFooter && <Footer/> }
     </SessionProvider>
     
   );

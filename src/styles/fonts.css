@@ -1,0 +1,59 @@
+@font-face {
+  font-family: "Apercu";
+  src: url("/fonts/apercu/Apercu-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apercu";
+  src: url("/fonts/apercu/apercu_bold_italic_pro.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apercu";
+  src: url("/fonts/apercu/apercu_bold_pro.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apercu";
+  src: url("/fonts/apercu/apercu_medium_italic_pro.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apercu";
+  src: url("/fonts/apercu/apercu_medium_pro.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apercu";
+  src: url("/fonts/apercu/apercu_regular_italic_pro.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Apercu";
+  src: url("/fonts/apercu/apercu_regular_pro.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-apercu: "Apercu", system-ui, sans-serif;
+}

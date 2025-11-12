@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import ProductCard from "./productCard";
-import { motion, AnimatePresence } from "framer-motion";
+import HeroCard from "./heroCard";
 
 interface Product {
   id: string;
@@ -30,30 +29,24 @@ export default function ProductsGrid() {
         if (!res.ok) throw new Error("Failed to fetch products");
         const data = await res.json();
         setProducts(data);
-      } catch (err) {
-        console.error("Error fetching products:", err);
+      } catch {
         setError("Could not load products. Try refreshing.");
       } finally {
         setLoading(false);
       }
     };
-
     fetchProducts();
   }, []);
 
   if (loading)
     return (
-      <div className="flex justify-center items-center py-20">
-        <p className="text-gray-500 text-sm tracking-wide">Loading products...</p>
+      <div className="flex justify-center items-center py-20 text-gray-500 text-sm">
+        Loading products...
       </div>
     );
 
   if (error)
-    return (
-      <div className="text-center py-20 text-red-500 font-medium">
-        {error}
-      </div>
-    );
+    return <div className="text-center py-20 text-red-500 font-medium">{error}</div>;
 
   if (products.length === 0)
     return (
@@ -62,49 +55,65 @@ export default function ProductsGrid() {
       </div>
     );
 
-  return (
-    <section className="px-6 md:px-12 lg:px-20 py-10">
-      <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-8">
-        Our Collection
-      </h2>
+  const chunkSize = 5;
+  const blocks = [];
+  for (let i = 0; i < products.length; i += chunkSize)
+    blocks.push(products.slice(i, i + chunkSize));
 
-      <AnimatePresence>
-        <motion.div
-          layout
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-12"
-        >
-          {products.map((product) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 15 }}
-              transition={{ duration: 0.3 }}
-            >
-              <ProductCard
-                product={{
-                  id: product.id,
-                  name: product.name,
-                  description: product.description,
-                  basePrice: product.basePrice,
-                  images: product.images?.length
-                  ? product.images
-                  : [{ url: "/placeholder.png", isPrimary: true }],
-                  category: product.category || "Uncategorized",
-                  stock:
-                    product.variants?.reduce(
-                      (sum, v) => sum + (v.stock || 0),
-                      0
-                    ) || 0,
-                  createdAt: product.createdAt,
-                }}
-                isAdded={false}
-                onAddToCart={() => {}}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
-      </AnimatePresence>
+  return (
+    <section className="px-3 sm:px-6 md:px-12 lg:px-20 py-12">
+      <h2 className="text-2xl md:text-3xl font-bold mb-8">Our Collection</h2>
+
+      <div className="space-y-16">
+        {blocks.map((block, idx) => {
+          const heroLeft = idx % 2 === 0;
+          return (
+            <div key={idx} className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+              {/* MOBILE */}
+              <div className="block md:hidden col-span-2">
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {block[0] && <ProductCard product={block[0]} />}
+                  {block[1] && <ProductCard product={block[1]} />}
+                </div>
+                {block[2] && <HeroCard product={block[2]} />}
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  {block[3] && <ProductCard product={block[3]} />}
+                  {block[4] && <ProductCard product={block[4]} />}
+                </div>
+              </div>
+
+              {/* DESKTOP */}
+              <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-6 w-full">
+                {heroLeft ? (
+                  <>
+                    {block[0] && <ProductCard product={block[0]} />}
+                    {block[1] && <ProductCard product={block[1]} />}
+                    {block[2] && (
+                      <div className="row-span-2 col-span-2">
+                        <HeroCard product={block[2]} />
+                      </div>
+                    )}
+                    {block[3] && <ProductCard product={block[3]} />}
+                    {block[4] && <ProductCard product={block[4]} />}
+                  </>
+                ) : (
+                  <>
+                    {block[0] && <ProductCard product={block[0]} />}
+                    {block[1] && <ProductCard product={block[1]} />}
+                    {block[2] && (
+                      <div className="row-span-2 col-span-2 col-start-1">
+                        <HeroCard product={block[2]} />
+                      </div>
+                    )}
+                    {block[3] && <ProductCard product={block[3]} />}
+                    {block[4] && <ProductCard product={block[4]} />}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
