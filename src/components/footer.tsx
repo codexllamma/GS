@@ -28,11 +28,13 @@ export default function Footer() {
         {/* Brand Info */}
         <div>
           <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent mb-3">
-            hier™
+            ĦIÈR™
           </h2>
           <p className="text-gray-400 mb-4 text-sm leading-relaxed">
-            A brand by THKR Futuretech Pvt. Ltd. redefining modern luxury and sustainable
-            design. Elegance meets innovation.
+            
+            To wear ĦIÈR is to wear heritage-
+            a signature of discretion, 
+            a silent emblem of belonging to the few who truly know.
           </p>
           <div className="flex space-x-4">
             {[Instagram, Linkedin, Twitter, Youtube].map((Icon, i) => (
@@ -54,7 +56,7 @@ export default function Footer() {
           <h3 className="text-lg font-semibold text-white mb-4">Quick Links</h3>
           <ul className="space-y-2 text-sm">
             {[
-              { name: "About", path: "/about" },
+              { name: "About", path: "/legal/about" },
               { name: "Contact", path: "/contact" },
               { name: "Privacy Policy", path: "/legal/privacy-policy" },
               { name: "Terms of Use", path: "/legal/terms" },

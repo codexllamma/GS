@@ -4,7 +4,6 @@ import { SessionProvider } from "next-auth/react";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { useCartStore } from "@/store/useCartStore";
-import Hero from "./landing";
 import Footer from "@/components/footer";
 import { useRouter } from "next/router";
 
@@ -30,8 +29,6 @@ export default function App({ Component, pageProps:{session, ...pageProps} }: Ap
 
   return (
     <SessionProvider session={session}>
-      {/*<Hero/>*/}
-      {/*<AuthGate/>*/}
       <Component {...pageProps} />
        { !shouldHideFooter && <Footer/> }
     </SessionProvider>

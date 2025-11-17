@@ -1,6 +1,7 @@
 import Head from "next/head";
 import Header from "@/components/header";
 import ProductsGrid from "@/components/productGrid";
+import AnimatedLogoFinal from "@/components/animatedLogo";
 
 export default function ProductsPage() {
   return (
@@ -14,7 +15,22 @@ export default function ProductsPage() {
 
           {/* Product grid section */}
           <ProductsGrid />
-        
+          
+          
     </>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

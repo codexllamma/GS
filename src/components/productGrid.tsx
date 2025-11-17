@@ -62,13 +62,12 @@ export default function ProductsGrid() {
 
   return (
     <section className="px-3 sm:px-6 md:px-12 lg:px-20 py-12">
-      <h2 className="text-2xl md:text-3xl font-bold mb-8">Our Collection</h2>
 
       <div className="space-y-16">
         {blocks.map((block, idx) => {
           const heroLeft = idx % 2 === 0;
           return (
-            <div key={idx} className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+            <div key={idx} className="gap-4 md:gap-8">
               {/* MOBILE */}
               <div className="block md:hidden col-span-2">
                 <div className="grid grid-cols-2 gap-3 mb-3">
