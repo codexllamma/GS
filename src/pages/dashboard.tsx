@@ -18,7 +18,7 @@ const Dashboard = () => {
 
     return (
         <>
-            {session?.user?.isAdmin ? <AdminDashboard /> : <UserDashboard />}
+            {session?.user?.isAdmin ? <UserDashboard /> : <UserDashboard />}
         </>
     );
 };

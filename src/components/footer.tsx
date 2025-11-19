@@ -57,7 +57,6 @@ export default function Footer() {
           <ul className="space-y-2 text-sm">
             {[
               { name: "About", path: "/legal/about" },
-              { name: "Contact", path: "/contact" },
               { name: "Privacy Policy", path: "/legal/privacy-policy" },
               { name: "Terms of Use", path: "/legal/terms" },
               { name: "Returns & Refunds", path: "/legal/returns" },

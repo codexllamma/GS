@@ -75,6 +75,8 @@ const Header: React.FC = () => {
             </Link>
 
             {/* Profile */}
+            <Link href={"/profile"}>
+            
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -82,6 +84,7 @@ const Header: React.FC = () => {
             >
               <User size={22} />
             </motion.button>
+            </Link>
           </div>
         </div>
       </div>

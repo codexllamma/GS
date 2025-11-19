@@ -17,7 +17,7 @@ const OrdersPage = () => {
 
     return (
         <>
-            {session?.user?.isAdmin ? <AdminOrders/> : <UserOrders/>}
+            {session?.user?.isAdmin ? <UserOrders/> : <UserOrders/>}
         </>
     );
 }

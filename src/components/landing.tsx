@@ -5,9 +5,44 @@ import Logo from "@/components/logo";
 import { ArrowRight, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { useAuthModal } from "@/store/useAuthModal";
+import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 
 export default function LandingPage() {
   const { open } = useAuthModal();
+  const [lookbookImages, setLookbookImages] = useState<string[]>([]);
+  const [index, setIndex] = useState(0);
+
+  // Auto-rotate image every 4s
+  useEffect(() => {
+    if (lookbookImages.length === 0) return;
+
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % lookbookImages.length);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [lookbookImages]);
+
+  // Fetch lookbook images (primary images from products)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/product");
+        const data = await res.json();
+
+        const imgs = data
+          .flatMap((p: any) => p.images)
+          .filter((img: any) => img?.url)
+          .map((img: any) => img.url);
+
+        setLookbookImages(imgs);
+      } catch (err) {
+        console.error("Failed to load hero images", err);
+      }
+    })();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -17,23 +52,36 @@ export default function LandingPage() {
         <AnimatedLogo />
       </header>
 
-      {/* HERO SECTION */}
+      {/* HERO: FADE-IN LOOKBOOK */}
       <section className="relative w-full h-[100vh] overflow-hidden bg-black">
-        <video
-          src="/hero.mp4"
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-30"
-        />
 
-        {/* Buffered Text Removed Per Request */}
+        {/* Background Image */}
+        <AnimatePresence mode="wait">
+  {lookbookImages.length > 0 && (
+    <motion.div
+      key={lookbookImages[index]}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 1.6, ease: "easeInOut" }}
+      className="absolute inset-0"
+    >
+      <Image
+        src={lookbookImages[index]}
+        alt="Lookbook"
+        fill
+        className="object-cover opacity-40"
+        priority
+      />
+    </motion.div>
+  )}
+</AnimatePresence>
+
 
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Center Title */}
+        {/* Center Logo */}
         <div className="absolute inset-0 flex items-center justify-center">
           <h1 className="text-white text-6xl md:text-8xl font-light tracking-tight">
             <Logo />
@@ -72,7 +120,7 @@ export default function LandingPage() {
         {/* FEATURE CARDS */}
         <div className="grid md:grid-cols-3 gap-8 mt-20">
 
-          {/* Card 1: Explore */}
+          {/* Card 1 */}
           <Link href="/product/products" className="group block">
             <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg">
               <div className="flex items-center justify-center w-12 h-12 bg-black mb-6 rounded-sm">
@@ -88,7 +136,7 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          {/* Card 2: Story */}
+          {/* Card 2 */}
           <Link href="/legal/about" className="group block">
             <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg">
               <div className="flex items-center justify-center w-12 h-12 bg-black mb-6 rounded-sm">
@@ -104,7 +152,7 @@ export default function LandingPage() {
             </div>
           </Link>
 
-          {/* Card 3: Join Now → Auth Modal */}
+          {/* Card 3 */}
           <button
             onClick={() => {
               localStorage.setItem("redirectIntent", "/dashboard");
