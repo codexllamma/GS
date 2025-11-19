@@ -50,42 +50,65 @@ export default function AuthPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      if (isSignUp) {
-        const res = await fetch("/api/auth/signup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Signup failed");
-      }
-
-      const res = await signIn("credentials", {
-        redirect: false,
-        email: form.email,
-        password: form.password,
+  try {
+    // If user is signing up, create account first
+    if (isSignUp) {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
       });
 
-      if (res?.error) throw new Error(res.error);
-      router.push("/dashboard");
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Signup failed");
     }
-  };
+
+    // Attempt login
+    const loginRes = await signIn("credentials", {
+      redirect: false,
+      email: form.email,
+      password: form.password,
+    });
+
+    if (loginRes?.error) throw new Error(loginRes.error);
+
+    // 🔥 IMPORT LOCAL GUEST CART INTO DB before navigating
+    try {
+      await fetch("/api/cart/import-local", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      console.error("Guest cart merge failed:", err);
+    }
+
+    // 🔥 Decide redirect target
+    const redirectIntent = localStorage.getItem("redirectIntent");
+    const target = redirectIntent || "/dashboard";
+
+    // Clear stored intent to avoid future hijacks
+    localStorage.removeItem("redirectIntent");
+
+    router.replace(target);
+  } catch (err: any) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    await signIn("google", { callbackUrl: "/dashboard" });
+    const redirectIntent = localStorage.getItem("redirectIntent") || "/dashboard";
+    await signIn("google", { callbackUrl: redirectIntent });
+
   };
 
-  // 🪶 Adaptive lift animation
+  
   const keyboardOffset = keyboardVisible ? -window.innerHeight * 0.15 : 0;
 
   return (

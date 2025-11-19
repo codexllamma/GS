@@ -1,23 +1,26 @@
+"use client";
+
 import AnimatedLogo from "@/components/animatedLogo";
 import Logo from "@/components/logo";
 import { ArrowRight, Sparkles, Users } from "lucide-react";
+import Link from "next/link";
+import { useAuthModal } from "@/store/useAuthModal";
 
 export default function LandingPage() {
-  
+  const { open } = useAuthModal();
+
   return (
     <div className="min-h-screen bg-white text-black">
 
-      
+      {/* HEADER */}
       <header className="max-w-7xl mx-auto py-4 flex items-center justify-center">
         <AnimatedLogo />
       </header>
 
-      
+      {/* HERO SECTION */}
       <section className="relative w-full h-[100vh] overflow-hidden bg-black">
-
-        
         <video
-          src="/hero.mp4"  // Replace this later with real video
+          src="/hero.mp4"
           autoPlay
           loop
           muted
@@ -25,39 +28,32 @@ export default function LandingPage() {
           className="absolute inset-0 w-full h-full object-cover opacity-30"
         />
 
-        {/* Stylized Placeholder (shows if video is missing) */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-          <div className="text-center text-white/40">
-            <div className="text-6xl mb-4">▶</div>
-            <p className="text-sm tracking-[0.25em]">VIDEO PLACEHOLDER</p>
-          </div>
-        </div>
+        {/* Buffered Text Removed Per Request */}
 
-        {/* Gradient Overlay for readability */}
+        {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Centered Brand Title */}
+        {/* Center Title */}
         <div className="absolute inset-0 flex items-center justify-center">
           <h1 className="text-white text-6xl md:text-8xl font-light tracking-tight">
-            <Logo/>
+            <Logo />
           </h1>
         </div>
 
         {/* CTA bottom-right */}
         <div className="absolute bottom-10 right-10">
-          <button className="group flex items-center gap-2 text-white/90 text-lg font-light">
-            <span className="group-hover:text-white transition-colors">
-              Explore Collection
-            </span>
-            <ArrowRight
-              size={18}
-              className="group-hover:translate-x-1 transition-transform"
-            />
-          </button>
+          <Link href="/product/products">
+            <button className="group flex items-center gap-2 text-white/90 text-lg font-light">
+              <span className="group-hover:text-white transition-colors">
+                Explore Collection
+              </span>
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+          </Link>
         </div>
       </section>
 
-      {/* ---------------- BRAND STATEMENT ---------------- */}
+      {/* BRAND BLOCK */}
       <section className="max-w-6xl mx-auto px-6 py-24">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <p className="text-2xl md:text-3xl leading-relaxed font-light">
@@ -73,79 +69,62 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* 3-CARD SECTION */}
+        {/* FEATURE CARDS */}
         <div className="grid md:grid-cols-3 gap-8 mt-20">
-          {/* Card 1 */}
-          <div className="group">
+
+          {/* Card 1: Explore */}
+          <Link href="/product/products" className="group block">
             <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg">
               <div className="flex items-center justify-center w-12 h-12 bg-black mb-6 rounded-sm">
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-normal mb-3">Explore Collection</h3>
               <p className="text-gray-600 mb-6 font-light leading-relaxed">
-                Discover our curated selection of timeless pieces crafted for
-                those who appreciate refined elegance.
+                Discover our curated selection of timeless pieces.
               </p>
-              <button className="flex items-center gap-2 text-black font-light hover:gap-3 transition-all group">
-                View Collection
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <span className="flex items-center gap-2 text-black font-light group-hover:gap-3 transition-all">
+                View Collection <ArrowRight className="w-4 h-4" />
+              </span>
             </div>
-          </div>
+          </Link>
 
-          {/* Card 2 */}
-          <div className="group">
+          {/* Card 2: Story */}
+          <Link href="/legal/about" className="group block">
             <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg">
               <div className="flex items-center justify-center w-12 h-12 bg-black mb-6 rounded-sm">
                 <span className="text-white font-bold text-xl">Ġ</span>
               </div>
               <h3 className="text-xl font-normal mb-3">Learn More</h3>
               <p className="text-gray-600 mb-6 font-light leading-relaxed">
-                Understand the philosophy behind ĦIÈR and the meticulous
-                craftsmanship defining every garment.
+                Understand the craftsmanship behind every garment.
               </p>
-              <button className="flex items-center gap-2 text-black font-light hover:gap-3 transition-all group">
-                Our Story
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <span className="flex items-center gap-2 text-black font-light group-hover:gap-3 transition-all">
+                Our Story <ArrowRight className="w-4 h-4" />
+              </span>
             </div>
-          </div>
+          </Link>
 
-          {/* Card 3 */}
-          <div className="group">
+          {/* Card 3: Join Now → Auth Modal */}
+          <button
+            onClick={() => {
+              localStorage.setItem("redirectIntent", "/dashboard");
+              open();
+            }}
+            className="group text-left"
+          >
             <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg">
               <div className="flex items-center justify-center w-12 h-12 bg-black mb-6 rounded-sm">
                 <Users className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-normal mb-3">Join Now</h3>
               <p className="text-gray-600 mb-6 font-light leading-relaxed">
-                Become part of an exclusive circle — early access, private
-                events, and personalized service.
+                Become part of an exclusive circle — early access & events.
               </p>
-              <button className="flex items-center gap-2 text-black font-light hover:gap-3 transition-all group">
-                Join Circle
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <span className="flex items-center gap-2 text-black font-light group-hover:gap-3 transition-all">
+                Join Circle <ArrowRight className="w-4 h-4" />
+              </span>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------- BOTTOM STATEMENT BLOCK ---------------- */}
-      <section className="bg-white py-24">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <div className="inline-block mb-8">
-            <div className="w-16 h-16 bg-black flex items-center justify-center mx-auto">
-              <span className="text-white font-bold text-3xl">Ġ</span>
-            </div>
-          </div>
-
-          <h2 className="text-4xl md:text-5xl font-light mb-6">For The Few Who Know</h2>
-
-          <p className="text-xl text-gray-600 font-light leading-relaxed max-w-2xl mx-auto">
-            Excellence is not announced. It is recognized by those who understand its
-            language — spoken through fabric, cut, and the quiet confidence of impeccable taste. 
-          </p>
+          </button>
         </div>
       </section>
     </div>

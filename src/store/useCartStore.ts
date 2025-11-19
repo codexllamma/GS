@@ -1,50 +1,127 @@
 import { create } from "zustand";
-import { Product, ProductVariant } from "@/generated/prisma";
 import { CartItem } from "@/types/cart";
 
-// --- Types ---
-export interface CartVariant extends ProductVariant {
-  product: Product & {
-    images: { url: string }[];
-  };
-}
+/*
+-----------------------------------------------------
+ GUEST CART LOCAL STORAGE HELPERS
+-----------------------------------------------------
+*/
+
+const GUEST_KEY = "guest_cart";
+
+const loadGuestCart = (): CartItem[] => {
+  try {
+    if (typeof window === "undefined") return [];
+    const raw = localStorage.getItem(GUEST_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveGuestCart = (cart: CartItem[]) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(GUEST_KEY, JSON.stringify(cart));
+};
+
+/*
+-----------------------------------------------------
+ ZUSTAND STORE
+-----------------------------------------------------
+*/
 
 interface CartStore {
   cart: CartItem[];
-  fetchCart: () => Promise<void>;
-  addToCart: (variantId: string, quantity?: number) => Promise<void>;
-  removeFromCart: (cartItemId: string) => Promise<void>;
-  updateQuantity: (cartItemId: string, quantity: number) => Promise<void>;
-  updateVariant: (cartItemId: string, variantId: string) => Promise<void>;
-  clearCart: () => void;
+
+  
+  fetchCart: (isAuth: boolean) => Promise<void>;
+
+  
+  addToCart: (variantId: string, quantity?: number, isAuth?: boolean) => Promise<void>;
+
+  
+  removeFromCart: (cartItemId: string, isAuth?: boolean) => Promise<void>;
+
+  
+  updateQuantity: (cartItemId: string, quantity: number, isAuth?: boolean) => Promise<void>;
+
+  
+  updateVariant: (cartItemId: string, variantId: string, isAuth?: boolean) => Promise<void>;
+
+  
+  clearCart: (isAuth?: boolean) => void;
+
+
+  syncGuestToDB: () => Promise<void>;
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
   cart: [],
 
-  
-  fetchCart: async () => {
+  /*
+  -----------------------------------------------------
+  FETCH CART
+  -----------------------------------------------------
+  */
+  fetchCart: async (isAuth) => {
+    if (!isAuth) {
+      const local = loadGuestCart();
+      set({ cart: local });
+      return;
+    }
+
     try {
       const res = await fetch("/api/cart");
       if (!res.ok) throw new Error("Failed to fetch cart");
 
       const data = await res.json();
 
-      // Normalize backend shape
-      const normalized = (data?.items || []).map((it: any) => ({
-        id: it.id,
-        quantity: it.quantity,
-        variant: it.variant,
+      const normalized = (data?.items || []).map((item: any) => ({
+        id: item.id,
+        quantity: item.quantity,
+        variant: item.variant,
       }));
 
       set({ cart: normalized });
-    } catch (err) {
-      console.error("Fetch cart failed:", err);
+
+      // clear guest cart, DB becomes primary
+      saveGuestCart([]);
+    } catch (error) {
+      console.error("Fetch cart failed:", error);
     }
   },
 
-  
-  addToCart: async (variantId, quantity = 1) => {
+  /*
+  -----------------------------------------------------
+  ADD ITEM
+  -----------------------------------------------------
+  */
+  addToCart: async (variantId, quantity = 1, isAuth = false) => {
+    if (!isAuth) {
+      const cur = loadGuestCart();
+      const existing = cur.find((c) => c.variant.id === variantId);
+
+      let updated: CartItem[];
+      if (existing) {
+        updated = cur.map((c) =>
+          c.variant.id === variantId ? { ...c, quantity: c.quantity + quantity } : c
+        );
+      } else {
+        updated = [
+          ...cur,
+          {
+            id: crypto.randomUUID(),
+            quantity,
+            variant: { id: variantId } as any,
+          },
+        ];
+      }
+
+      saveGuestCart(updated);
+      set({ cart: updated });
+      return;
+    }
+
     try {
       const res = await fetch("/api/cart", {
         method: "POST",
@@ -54,14 +131,25 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
       if (!res.ok) throw new Error("Failed to add to cart");
 
-      await get().fetchCart(); // re-fetch latest state
-    } catch (err) {
-      console.error("Add to cart failed:", err);
+      await get().fetchCart(true);
+    } catch (error) {
+      console.error("Add to cart failed:", error);
     }
   },
 
-  // 🧩 REMOVE ITEM
-  removeFromCart: async (cartItemId) => {
+  /*
+  -----------------------------------------------------
+  REMOVE ITEM
+  -----------------------------------------------------
+  */
+  removeFromCart: async (cartItemId, isAuth = false) => {
+    if (!isAuth) {
+      const updated = loadGuestCart().filter((c) => c.id !== cartItemId);
+      saveGuestCart(updated);
+      set({ cart: updated });
+      return;
+    }
+
     try {
       const res = await fetch("/api/cart", {
         method: "DELETE",
@@ -69,18 +157,31 @@ export const useCartStore = create<CartStore>((set, get) => ({
         body: JSON.stringify({ cartItemId }),
       });
 
-      if (!res.ok) throw new Error("Failed to remove from cart");
+      if (!res.ok) throw new Error("Failed to remove item");
 
       set((state) => ({
         cart: state.cart.filter((item) => item.id !== cartItemId),
       }));
-    } catch (err) {
-      console.error("Remove from cart failed:", err);
+    } catch (error) {
+      console.error("Remove item failed:", error);
     }
   },
 
-  // 🧩 UPDATE QUANTITY
-  updateQuantity: async (cartItemId, quantity) => {
+  /*
+  -----------------------------------------------------
+  UPDATE QUANTITY
+  -----------------------------------------------------
+  */
+  updateQuantity: async (cartItemId, quantity, isAuth = false) => {
+    if (!isAuth) {
+      const updated = loadGuestCart().map((c) =>
+        c.id === cartItemId ? { ...c, quantity } : c
+      );
+      saveGuestCart(updated);
+      set({ cart: updated });
+      return;
+    }
+
     try {
       const res = await fetch("/api/cart", {
         method: "PUT",
@@ -94,19 +195,29 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
       set((state) => ({
         cart: state.cart.map((item) =>
-          item.id === updatedItem.id
-            ? { ...item, quantity: updatedItem.quantity }
-            : item
+          item.id === updatedItem.id ? { ...item, quantity: updatedItem.quantity } : item
         ),
       }));
-    } catch (err) {
-      console.error("Update quantity failed:", err);
+    } catch (error) {
+      console.error("Update quantity failed:", error);
     }
   },
 
-  clearCart: () => set({ cart: [] }),
-  
-  updateVariant: async (cartItemId, variantId) => {
+  /*
+  -----------------------------------------------------
+  UPDATE VARIANT
+  -----------------------------------------------------
+  */
+  updateVariant: async (cartItemId, variantId, isAuth = false) => {
+    if (!isAuth) {
+      const updated = loadGuestCart().map((c) =>
+        c.id === cartItemId ? { ...c, variant: { id: variantId } as any } : c
+      );
+      saveGuestCart(updated);
+      set({ cart: updated });
+      return;
+    }
+
     try {
       const res = await fetch("/api/cart", {
         method: "PUT",
@@ -123,12 +234,41 @@ export const useCartStore = create<CartStore>((set, get) => ({
           item.id === cartItemId ? updatedItem : item
         ),
       }));
-    } catch (err) {
-      console.error("Update variant failed:", err);
+    } catch (error) {
+      console.error("Update variant failed:", error);
     }
   },
 
+  /*
+  -----------------------------------------------------
+  CLEAR CART
+  -----------------------------------------------------
+  */
+  clearCart: (isAuth = false) => {
+    if (!isAuth) saveGuestCart([]);
+    set({ cart: [] });
+  },
 
+  /*
+  -----------------------------------------------------
+  SYNC GUEST CART → DB AFTER LOGIN
+  -----------------------------------------------------
+  */
+  syncGuestToDB: async () => {
+    const guest = loadGuestCart();
+    if (!guest.length) return;
 
+    try {
+      await fetch("/api/cart/import-local", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: guest }),
+      });
+
+      saveGuestCart([]);
+      await get().fetchCart(true);
+    } catch (error) {
+      console.error("Guest cart sync failed:", error);
+    }
+  },
 }));
-
