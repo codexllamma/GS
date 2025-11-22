@@ -27,12 +27,14 @@ export default function Footer() {
       <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
         {/* Brand Info */}
         <div>
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent mb-3">
-            ĦIÈR™
+          <h2 className="font-saira text-2xl font-bold bg-gradient-to-r text-white bg-clip-text text-transparent mb-3">
+            ĦIÈR
           </h2>
-          <p className="text-gray-400 mb-4 text-sm leading-relaxed">
+          <p className="text-gray-400 mb-4 leading-relaxed">
             
-            To wear ĦIÈR is to wear heritage-
+            To wear   <span className="font-saira">
+                   ĦIÈR
+              </span> is to wear heritage-
             a signature of discretion, 
             a silent emblem of belonging to the few who truly know.
           </p>
@@ -81,11 +83,11 @@ export default function Footer() {
           <ul className="space-y-3 text-sm">
             <li className="flex items-center space-x-2">
               <Mail className="w-4 h-4 text-amber-400" />
-              <span>support@hier.store</span>
+              <span>support@hièr.store</span>
             </li>
             <li className="flex items-center space-x-2">
               <Phone className="w-4 h-4 text-amber-400" />
-              <span>+91 98989 89898</span>
+              <span>+91 9920511572 </span>
             </li>
           </ul>
         </div>
@@ -106,7 +108,7 @@ export default function Footer() {
       {/* Bottom Bar */}
       <div className="relative z-10 mt-10 border-t border-white/10 pt-6 text-center text-xs text-gray-500">
         © {new Date().getFullYear()} THKR Futuretech Pvt. Ltd. All Rights Reserved.  
-        hier™ and its logo are registered trademarks.
+        hièr and its logo are registered trademarks.
       </div>
     </footer>
   );

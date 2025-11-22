@@ -12,6 +12,8 @@ module.exports = {
     extend: {
       fontFamily: {
       apercu: ['var(--font-apercu)', 'system-ui', 'sans-serif'],
+      rajdhani: ['var(--font-apercu)', 'system-ui', 'sans-serif'],
+      saira: ['var(--font-saira)', 'system-ui', 'sans-serif']
     }
     },
   },

@@ -53,7 +53,7 @@ export default function App({
       <AuthModal />
 
       {/* Footer conditional */}
-      <div className="py-10">
+      <div className="">
 
       {!shouldHideFooter && <Footer />}
       </div>

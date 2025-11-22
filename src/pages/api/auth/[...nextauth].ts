@@ -5,19 +5,15 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
 
-console.log("NEXTAUTH_SECRET:", process.env.NEXTAUTH_SECRET);
-
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
 
   providers: [
-    
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -37,22 +33,15 @@ export const authOptions: NextAuthOptions = {
           throw new Error("No account found with this email");
         }
 
-        
         if (!user.password) {
           throw new Error("This account uses Google Sign-In only");
         }
 
-        /*
-        if (!user.emailVerified) {
-          throw new Error("Please verify your email before signing in");
-        }
-        */
         const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) {
           throw new Error("Incorrect password");
         }
 
-        
         return user;
       },
     }),
@@ -75,7 +64,6 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -86,7 +74,6 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
 
-    // 🔹 Adds extra data to session object
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
@@ -97,43 +84,49 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
 
-    // 🔹 Runs when user signs in (handles both Google + credentials)
     async signIn({ user, account }) {
       try {
-        const provider = account?.provider;
+        const isPrelaunch = process.env.PRELAUNCH_MODE === "true";
+        const email = (user as any)?.email;
+
+        if (!account?.provider || !email) return false;
+
+        if (isPrelaunch) {
+          const allowedUsers =
+            process.env.PRELAUNCH_ALLOWED_USERS?.split(",") || [];
+          const admins = process.env.PRELAUNCH_ALLOWED_ADMIN?.split(",") || [];
+
+          const isAllowed =
+            allowedUsers.includes(email) || admins.includes(email);
+
+          if (!isAllowed) {
+            throw new Error("PRELAUNCH_ACCESS_DENIED");
+          }
+        }
+
         const userId = (user as any)?.id;
-
-        if (!provider || !userId) return false;
-
         const existingUser = await prisma.user.findUnique({
           where: { id: userId },
         });
 
         if (existingUser) {
-          // Update provider if needed
           await prisma.user.update({
             where: { id: userId },
-            data: { authProvider: provider },
+            data: { authProvider: account.provider },
           });
         } else {
-          // Create new Google user if missing
           await prisma.user.create({
             data: {
               id: userId,
               email: user.email,
               name: user.name,
               image: user.image,
-              authProvider: provider,
+              authProvider: account.provider,
               emailVerified: new Date(),
             },
           });
         }
 
-        /*
-        if (provider === "credentials" && !user.emailVerified) {
-          return false;
-        }
-        */
         return true;
       } catch (err) {
         console.error("signIn error:", err);
@@ -147,7 +140,7 @@ export const authOptions: NextAuthOptions = {
     signOut: "/",
     error: "/auth/error",
     verifyRequest: "/auth/verify-request",
-    newUser: "/dashboard", 
+    newUser: "/dashboard",
   },
 
   secret: process.env.NEXTAUTH_SECRET!,

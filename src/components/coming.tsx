@@ -2,30 +2,29 @@
 
 import AnimatedLogo from "@/components/animatedLogo";
 import Logo from "@/components/logo";
-import { ArrowRight, Shirt, ShoppingBasket, Sparkles,Handbag, Users, Hand, ShoppingBag, ShoppingCart, ShieldAlert, LucideShirt, ShirtIcon } from "lucide-react";
+import { ArrowRight, ShirtIcon, Users } from "lucide-react";
 import Link from "next/link";
 import { useAuthModal } from "@/store/useAuthModal";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-export default function LandingPage() {
+export default function ComingSoonLanding() {
   const { open } = useAuthModal();
   const [lookbookImages, setLookbookImages] = useState<string[]>([]);
   const [index, setIndex] = useState(0);
 
-  // Auto-rotate image every 4s
+  // Auto-rotate images
   useEffect(() => {
-    if (lookbookImages.length === 0) return;
-
-    const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % lookbookImages.length);
-    }, 4000);
-
+    if (!lookbookImages.length) return;
+    const interval = setInterval(
+      () => setIndex((prev) => (prev + 1) % lookbookImages.length),
+      4000
+    );
     return () => clearInterval(interval);
   }, [lookbookImages]);
 
-  // Fetch lookbook images (primary images from products)
+  // Fetch lookbook images from product API
   useEffect(() => {
     (async () => {
       try {
@@ -37,12 +36,26 @@ export default function LandingPage() {
           .filter((img: any) => img?.url)
           .map((img: any) => img.url);
 
-        setLookbookImages(imgs);
+        if (imgs.length > 0) {
+          setLookbookImages(imgs);
+        } else {
+          setLookbookImages([
+            "/luxury/1.jpg",
+            "/luxury/2.jpg",
+            "/luxury/3.jpg",
+            "/luxury/4.jpg",
+          ]);
+        }
       } catch (err) {
         console.error("Failed to load hero images", err);
       }
     })();
   }, []);
+
+  const handleJoinClick = () => {
+    localStorage.setItem("redirectIntent", "/dashboard");
+    open();
+  };
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -57,26 +70,25 @@ export default function LandingPage() {
 
         {/* Background Image */}
         <AnimatePresence mode="wait">
-  {lookbookImages.length > 0 && (
-    <motion.div
-      key={lookbookImages[index]}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 1.6, ease: "easeInOut" }}
-      className="absolute inset-0"
-    >
-      <Image
-        src={lookbookImages[index]}
-        alt="Lookbook"
-        fill
-        className="object-cover opacity-40"
-        priority
-      />
-    </motion.div>
-  )}
-</AnimatePresence>
-
+          {lookbookImages.length > 0 && (
+            <motion.div
+              key={lookbookImages[index]}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.6, ease: "easeInOut" }}
+              className="absolute inset-0"
+            >
+              <Image
+                src={lookbookImages[index]}
+                alt="Lookbook"
+                fill
+                className="object-cover opacity-40"
+                priority
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
@@ -88,16 +100,14 @@ export default function LandingPage() {
           </h1>
         </div>
 
-        {/* CTA bottom-right */}
+        {/* CTA bottom-right — Locked */}
         <div className="absolute bottom-10 right-10">
-          <Link href="/product/products">
-            <button className="group flex items-center gap-2 text-white/90 text-lg font-light">
-              <span className="group-hover:text-white transition-colors">
-                Explore Collection
-              </span>
-              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-          </Link>
+          <button
+            disabled
+            className="cursor-not-allowed text-white/40 border border-white/20 px-6 py-3 rounded-full"
+          >
+            Explore Collection (Locked)
+          </button>
         </div>
       </section>
 
@@ -120,33 +130,32 @@ export default function LandingPage() {
         {/* FEATURE CARDS */}
         <div className="grid md:grid-cols-3 gap-8 mt-20">
 
-          {/* Card 1 */}
-          <Link href="/product/products" className="group block">
-            <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg">
+          {/* Card 1 — Locked */}
+          <button
+            disabled
+            className="group block cursor-not-allowed"
+          >
+            <div className="bg-white p-8 rounded-sm border border-gray-200 opacity-40">
               <div className="flex items-center justify-center w-12 h-12 bg-black mb-6 rounded-sm">
                 <ShirtIcon className="w-6 h-6 text-white" />
               </div>
               <h3 className="text-xl font-normal mb-3">Explore Collection</h3>
               <p className="text-gray-600 mb-6 font-light leading-relaxed">
-                Discover our curated selection of timeless pieces.
+                Coming soon — be the first to gain access.
               </p>
-              <span className="flex items-center gap-2 text-black font-light group-hover:gap-3 transition-all">
-                View Collection <ArrowRight className="w-4 h-4" />
-              </span>
             </div>
-          </Link>
+          </button>
 
-          {/* Card 2 */}
+          {/* Card 2 — About (open) */}
           <Link href="/legal/about" className="group block">
             <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg">
-              <div className="relative flex items-center text-white justify-center w-12 h-12 bg-black mb-6 rounded-sm">
-                
+              <div className="relative flex items-center justify-center w-12 h-12 bg-black mb-6 rounded-sm">
                 <Image 
-                src={"/logo_white.svg"}
-                alt='/'
-                height={46}
-                width={46}
-                className="absolute top-2.5 left-1 logo-bold"
+                  src={"/logo_white.svg"}
+                  alt="/"
+                  height={46}
+                  width={46}
+                  className="absolute top-2.5 left-1 logo-bold"
                 />
               </div>
               <h3 className="text-xl font-normal mb-3">Learn More</h3>
@@ -158,13 +167,10 @@ export default function LandingPage() {
               </span>
             </div>
           </Link>
-          
-          {/* Card 3 */}
+
+          {/* Card 3 — Join (Auth) */}
           <button
-            onClick={() => {
-              localStorage.setItem("redirectIntent", "/dashboard");
-              open();
-            }}
+            onClick={handleJoinClick}
             className="group text-left"
           >
             <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg">
@@ -180,6 +186,7 @@ export default function LandingPage() {
               </span>
             </div>
           </button>
+
         </div>
       </section>
     </div>

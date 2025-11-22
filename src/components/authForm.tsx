@@ -4,12 +4,16 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, User, Eye, EyeOff, Chrome } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 
 interface AuthFormProps {
-  onSuccess?: () => void; // used by AuthModal to auto-close on login
+  onSuccess?: () => void;
 }
 
 const AuthForm = ({ onSuccess }: AuthFormProps) => {
+  const router = useRouter();
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [form, setForm] = useState({ email: "", password: "", name: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +35,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
         });
+
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Signup failed");
       }
@@ -41,9 +46,17 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
         password: form.password,
       });
 
-      if (loginRes?.error) throw new Error(loginRes.error);
+      if (loginRes?.error === "PRELAUNCH_ACCESS_DENIED") {
+        toast.error("Only approved users allowed during pre-launch.");
+        setLoading(false);
+        return;
+      }
 
-      // Merge guest cart to DB
+      if (loginRes?.error) {
+        throw new Error(loginRes.error);
+      }
+
+      // Merge guest cart
       try {
         await fetch("/api/cart/import-local", {
           method: "POST",
@@ -54,8 +67,13 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
       const redirectIntent = localStorage.getItem("redirectIntent");
       localStorage.removeItem("redirectIntent");
 
-      if (onSuccess) onSuccess(); // closes modal in modal-mode
-      else window.location.replace(redirectIntent || "/dashboard");
+      if (onSuccess) {
+        onSuccess();
+        router.push(redirectIntent || "/dashboard");
+      } else {
+        router.push(redirectIntent || "/dashboard");
+      }
+
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -65,8 +83,13 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    const redirectIntent = localStorage.getItem("redirectIntent") || "/dashboard";
-    await signIn("google", { callbackUrl: redirectIntent });
+
+    const redirectIntent =
+      localStorage.getItem("redirectIntent") || "/dashboard";
+
+    await signIn("google", {
+      callbackUrl: redirectIntent,
+    });
   };
 
   return (
@@ -103,6 +126,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
           )}
         </AnimatePresence>
 
+        {/* EMAIL */}
         <div className="relative">
           <Mail className="absolute left-3 top-3 h-5 w-5 text-neutral-400" />
           <input
@@ -116,6 +140,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
           />
         </div>
 
+        {/* PASSWORD */}
         <div className="relative">
           <Lock className="absolute left-3 top-3 h-5 w-5 text-neutral-400" />
           <input
@@ -145,6 +170,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
         </button>
       </form>
 
+      {/* GOOGLE AUTH */}
       <button
         onClick={handleGoogleSignIn}
         disabled={loading}
@@ -153,6 +179,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
         <Chrome size={18} /> Continue with Google
       </button>
 
+      {/* TOGGLE LOGIN <-> SIGNUP */}
       <p className="text-center text-sm text-neutral-600 mt-4">
         {isSignUp ? "Already have an account? " : "New here? "}
         <button
@@ -164,6 +191,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
         </button>
       </p>
 
+      {/* ERROR */}
       {error && (
         <p className="text-red-600 text-center mt-3 text-sm font-medium">
           {error}

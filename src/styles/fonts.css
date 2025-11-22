@@ -54,6 +54,57 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Rajdhani";
+  src: url("/fonts/rajdhani/Rajdhani-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  src: url("/fonts/rajdhani/Rajdhani-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  src: url("/fonts/rajdhani/Rajdhani-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  src: url("/fonts/rajdhani/Rajdhani-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  src: url("/fonts/rajdhani/Rajdhani-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Saira";
+  src: url("/fonts/saira/Saira.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+
 :root {
   --font-apercu: "Apercu", system-ui, sans-serif;
+  --font-rajdhani: "Rajdhani", system-ui, sans-serif;
+  --font-saira: "Saira", system-ui, sans-serif;
 }
