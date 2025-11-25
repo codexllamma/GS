@@ -2,6 +2,12 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import prisma from "@/lib/prisma";
+import Razorpay from "razorpay";
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID!,
+  key_secret: process.env.RAZORPAY_KEY_SECRET!,
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -16,30 +22,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const userId = session.user.id;
-    const { address, paymentMethod } = req.body as {
-      address: {
-        line1: string;
-        line2?: string;
-        city: string;
-        state: string;
-        postal: string;
-        country: string;
-      };
-      paymentMethod: "COD" | "RAZORPAY";
-    };
+    const { address, paymentMethod } = req.body;
 
     if (!address || !paymentMethod) {
-      return res
-        .status(400)
-        .json({ message: "Address and payment method are required" });
+      return res.status(400).json({ message: "Address and payment method are required" });
     }
 
-    // For now we *force* COD. Razorpay goes live later.
-    if (paymentMethod !== "COD") {
-      return res.status(400).json({ message: "Only COD is enabled currently" });
-    }
-
-    // 1. Upsert address (can be outside the TX)
+    // 1) Ensure address exists or create
     let existingAddress = await prisma.address.findFirst({
       where: {
         userId,
@@ -64,20 +53,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // 2. Wrap everything else in a single transaction
+    // 2) Transaction: validate stock, create order, clear cart
     const order = await prisma.$transaction(async (tx) => {
-      // 2.1. Fetch cart with latest data
       const cart = await tx.cart.findFirst({
         where: { userId },
         include: {
           items: {
-            include: {
-              variant: {
-                include: {
-                  product: true,
-                },
-              },
-            },
+            include: { variant: { include: { product: true } } },
           },
         },
       });
@@ -86,48 +68,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error("Cart is empty");
       }
 
-      // 2.2. Calculate subtotal from *live* data
       const subtotal = cart.items.reduce((sum, item) => {
-        const unitPrice =
-          item.variant.price ?? item.variant.product.basePrice ?? 0;
-        return sum + item.quantity * unitPrice;
+        const price = item.variant.price ?? item.variant.product.basePrice ?? 0;
+        return sum + item.quantity * price;
       }, 0);
 
-      const deliveryCharge = subtotal > 1000 ? 0 : 50;
+      const deliveryCharge = 0;
       const total = subtotal + deliveryCharge;
 
-      // 2.3. Validate and decrement stock atomically
       for (const item of cart.items) {
         const result = await tx.productVariant.updateMany({
-          where: {
-            id: item.variantId,
-            stock: { gte: item.quantity }, // ensure enough stock
-          },
-          data: {
-            stock: {
-              decrement: item.quantity,
-            },
-          },
+          where: { id: item.variantId, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
         });
 
         if (result.count === 0) {
           throw new Error(
-            `Insufficient stock for variant ${item.variantId} (${item.variant.product.name} - ${item.variant.size})`
+            `Insufficient stock for ${item.variant.product.name} - ${item.variant.size}`
           );
         }
       }
 
-      // 2.4. Create order + order items
       const createdOrder = await tx.order.create({
         data: {
           userId,
           addressId: existingAddress.id,
-          paymentMethod: "COD",
+          paymentMethod,
           subtotal,
           deliveryCharge,
           total,
-          isPaid: false, // COD, not actually paid yet
-          status: "PROCESSING", // order placed, waiting for shipment
+          status: paymentMethod === "COD" ? "PROCESSING" : "PENDING",
+          isPaid: paymentMethod === "COD",
           shipmentStatus: "NOT_CREATED",
           orderItems: {
             create: cart.items.map((item) => ({
@@ -139,47 +110,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             })),
           },
         },
-        include: {
-          orderItems: {
-            include: {
-              variant: { include: { product: true } },
-            },
-          },
-        },
+        include: { orderItems: true },
       });
 
-      // 2.5. Clear cart
-      await tx.cartItem.deleteMany({
-        where: { cartId: cart.id },
-      });
+      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
 
       return createdOrder;
     });
 
-    // 3. At this point: stock decremented, order created, cart cleared.
-    // XpressBees shipment creation will plug in HERE later.
+    // 3) Payment flow based on method
+    if (paymentMethod === "RAZORPAY") {
+      const razorpayOrder = await razorpay.orders.create({
+        amount: Math.round(order.total * 100),
+        currency: "INR",
+        receipt: `rpay_${order.id.slice(0, 8)}`,
+        notes: {
+          internalOrderId: order.id,
+          userId,
+        },
+      });
 
+      return res.status(201).json({
+        order,
+        razorpayOrder,
+        message: "Proceed to payment",
+      });
+    }
+
+    // COD fallback
     return res.status(201).json({
       order,
-      message: "Cash on Delivery order placed successfully",
+      message: "Cash on Delivery order placed",
     });
+
   } catch (error: any) {
     console.error("Checkout API error:", error);
-    const message =
-      error?.message === "Cart is empty"
-        ? "Cart is empty"
-        : error?.message?.startsWith("Insufficient stock")
-        ? error.message
-        : "Internal Server Error";
 
-    const statusCode =
-      message === "Cart is empty" || message.startsWith("Insufficient stock")
-        ? 400
-        : 500;
+    const msg = error?.message || "Internal Server Error";
+    const isClientErr =
+      msg === "Cart is empty" || msg.startsWith("Insufficient stock");
 
-    return res.status(statusCode).json({
-      message,
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
+    return res.status(isClientErr ? 400 : 500).json({ message: msg });
   }
 }
