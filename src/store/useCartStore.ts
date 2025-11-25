@@ -58,44 +58,37 @@ interface CartStore {
 export const useCartStore = create<CartStore>((set, get) => ({
   cart: [],
 
-  /*
-  -----------------------------------------------------
-  FETCH CART
-  -----------------------------------------------------
-  */
+  
   fetchCart: async (isAuth) => {
-    if (!isAuth) {
-      const local = loadGuestCart();
-      set({ cart: local });
-      return;
-    }
+  
 
-    try {
-      const res = await fetch("/api/cart");
-      if (!res.ok) throw new Error("Failed to fetch cart");
+  if (!isAuth) {
+    const local = loadGuestCart();
+    set({ cart: local });
+    return;
+  }
 
-      const data = await res.json();
+  try {
+    const res = await fetch("/api/cart");
+    if (!res.ok) throw new Error("Failed to fetch cart");
 
-      const normalized = (data?.items || []).map((item: any) => ({
-        id: item.id,
-        quantity: item.quantity,
-        variant: item.variant,
-      }));
+    const data = await res.json();
 
-      set({ cart: normalized });
+    const normalized = (data?.items || []).map((item: any) => ({
+      id: item.id,
+      quantity: item.quantity,
+      variant: item.variant,
+    }));
 
-      // clear guest cart, DB becomes primary
-      saveGuestCart([]);
-    } catch (error) {
-      console.error("Fetch cart failed:", error);
-    }
-  },
+    set({ cart: normalized });
+    saveGuestCart([]);
+  } catch (error) {
+    console.error(error);
+  }
+},
 
-  /*
-  -----------------------------------------------------
-  ADD ITEM
-  -----------------------------------------------------
-  */
+
+  
   addToCart: async (variantId, quantity = 1, isAuth = false) => {
     if (!isAuth) {
       const cur = loadGuestCart();
