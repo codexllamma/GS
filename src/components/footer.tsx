@@ -64,6 +64,7 @@ export default function Footer() {
               { name: "Returns & Refunds", path: "/legal/returns" },
               { name: "Cookie Policy", path: "/legal/cookies" },
               { name: "Legal Notice", path: "/legal/legal-notice" },
+              { name: "Shipping", path: "/legal/shipping"}
             ].map((link, idx) => (
               <li key={idx}>
                 <Link
