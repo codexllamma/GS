@@ -170,7 +170,7 @@ export default function LandingPage() {
           </Link>
 
           {/* Card 2 */}
-          <Link href="/legal/about" className="group block h-full">
+          <Link href="/legal/learn" className="group block h-full">
             <div className="bg-white p-8 rounded-sm border border-gray-200 hover:border-black transition-all duration-300 hover:shadow-lg h-full flex flex-col items-start">
               <div className="relative flex items-center text-white justify-center w-12 h-12 bg-black mb-6 rounded-sm overflow-hidden">
                 <Image 
