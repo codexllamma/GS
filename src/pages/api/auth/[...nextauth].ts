@@ -84,55 +84,35 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
 
-    async signIn({ user, account }) {
-      try {
-        const isPrelaunch = process.env.PRELAUNCH_MODE === "true";
-        const email = (user as any)?.email;
+async signIn({ user, account }) {
+  try {
+    if (!account?.provider || !user.email) return false;
 
-        if (!account?.provider || !email) return false;
+    // PRELAUNCH MODE CHECK (KEEP THIS)
+    const isPrelaunch = process.env.PRELAUNCH_MODE === "true";
+    if (isPrelaunch) {
+      const allowedUsers =
+        process.env.PRELAUNCH_ALLOWED_USERS?.split(",") || [];
+      const admins =
+        process.env.PRELAUNCH_ALLOWED_ADMIN?.split(",") || [];
 
-        if (isPrelaunch) {
-          const allowedUsers =
-            process.env.PRELAUNCH_ALLOWED_USERS?.split(",") || [];
-          const admins = process.env.PRELAUNCH_ALLOWED_ADMIN?.split(",") || [];
+      const isAllowed =
+        allowedUsers.includes(user.email) || admins.includes(user.email);
 
-          const isAllowed =
-            allowedUsers.includes(email) || admins.includes(email);
+      if (!isAllowed) throw new Error("PRELAUNCH_ACCESS_DENIED");
+    }
 
-          if (!isAllowed) {
-            throw new Error("PRELAUNCH_ACCESS_DENIED");
-          }
-        }
+    // 🔥 IMPORTANT: DO NOT MANUALLY CREATE USER OR ACCOUNT HERE.
+    // PrismaAdapter handles this automatically.
 
-        const userId = (user as any)?.id;
-        const existingUser = await prisma.user.findUnique({
-          where: { id: userId },
-        });
+    return true;
+  } catch (err) {
+    console.error("signIn error:", err);
+    return false;
+  }
+}
 
-        if (existingUser) {
-          await prisma.user.update({
-            where: { id: userId },
-            data: { authProvider: account.provider },
-          });
-        } else {
-          await prisma.user.create({
-            data: {
-              id: userId,
-              email: user.email,
-              name: user.name,
-              image: user.image,
-              authProvider: account.provider,
-              emailVerified: new Date(),
-            },
-          });
-        }
-
-        return true;
-      } catch (err) {
-        console.error("signIn error:", err);
-        return false;
-      }
-    },
+,
   },
 
   pages: {

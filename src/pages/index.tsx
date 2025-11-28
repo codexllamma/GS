@@ -1,13 +1,16 @@
-import AdminDashboard from "@/components/adminDashboard"
-import ComingSoonLanding from "@/components/coming"
-import ComingSoonPremium from "@/components/coming"
-import LandingPage from "@/components/landing"
+// pages/index.tsx
+import LandingPage from "@/components/landing";
+import dynamic from "next/dynamic";
 
+const ComingSoonLanding = dynamic(
+  () => import("@/components/coming"),
+  { ssr: false }
+);
 
 export default function Home() {
-  return(
+  return (
     <>
-    <ComingSoonLanding/>
+    <LandingPage/>
     </>
-  )
+  );
 }

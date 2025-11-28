@@ -39,7 +39,7 @@ export default function Footer() {
             a silent emblem of belonging to the few who truly know.
           </p>
           <div className="flex space-x-4">
-            {[Instagram, Linkedin, Twitter, Youtube].map((Icon, i) => (
+            {[Instagram, Facebook].map((Icon, i) => (
               <motion.a
                 key={i}
                 href="#"
@@ -89,6 +89,10 @@ export default function Footer() {
             <li className="flex items-center space-x-2">
               <Phone className="w-4 h-4 text-amber-400" />
               <span>+91 9920511572 </span>
+              
+            </li>
+            <li className="grid items-center space-x-4">
+              <span className="px-7">(10a.m to 7p.m)</span>
             </li>
           </ul>
         </div>
@@ -109,7 +113,6 @@ export default function Footer() {
       {/* Bottom Bar */}
       <div className="relative z-10 mt-10 border-t border-white/10 pt-6 text-center text-xs text-gray-500">
         © {new Date().getFullYear()} THKR Futuretech Pvt. Ltd. All Rights Reserved.  
-        hièr and its logo are registered trademarks.
       </div>
     </footer>
   );
