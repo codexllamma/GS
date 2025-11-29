@@ -4,9 +4,7 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        {/* REMOVE this if it exists: <link rel="icon" href="/favicon.ico" /> */}
-        
-        {/* ADD THIS: Link to your new PNG in the public folder */}
+        <meta name="google-site-verification" content="dt_8Ys82IHR3jaj2Niv4s4K1bkEXV8yG2o_viodWdUs" />
         <link rel="icon" href="/icon.png" type="image/png" />
       </Head>
       <body className="antialiased">
