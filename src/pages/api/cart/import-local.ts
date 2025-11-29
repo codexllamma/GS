@@ -21,7 +21,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!guestItems.length)
     return res.status(200).json({ message: "Nothing to merge", items: [] });
 
-  // 1️⃣ Get or create user's cart
   let userCart = await prisma.cart.findFirst({
     where: { userId },
     include: {
