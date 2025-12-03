@@ -8,12 +8,6 @@ const Dashboard = () => {
     const router = useRouter();
     const { data: session, status } = useSession();
 
-    useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/auth");
-        }
-    }, [status, router]);
-
     if (status === "loading") return <p>Loading...</p>;
 
     return (
