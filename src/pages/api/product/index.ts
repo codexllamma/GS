@@ -2,22 +2,57 @@ import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+  
   if (req.method === "GET") {
     try {
-      // --- START CHANGES ---
-      // 1. Get page and limit from query params (default: Page 1, Limit 9)
       const page = Number(req.query.page) || 1;
       const limit = Number(req.query.limit) || 9;
       const skip = (page - 1) * limit;
 
+      const category = req.query.category as string;
+      const search = req.query.search as string;
+
+      const whereClause: any = { isDeleted: false };
+
+      // 1. Filter by Category (Strict Match)
+      if (category && category !== "All") {
+        whereClause.fabric = {
+          category: {
+            name: { equals: category, mode: "insensitive" },
+          },
+        };
+      }
+
+      // 2. Smart Search (Tokenized)
+      // "White Shirt" -> Matches products having BOTH "White" AND "Shirt"
+      if (search) {
+        const searchTerms = search.trim().split(/\s+/);
+        
+        whereClause.AND = searchTerms.map((term) => ({
+          OR: [
+            { name: { contains: term, mode: "insensitive" } },
+            { description: { contains: term, mode: "insensitive" } },
+            { color: { contains: term, mode: "insensitive" } },
+            // Also search within the Category Name (e.g., searching "Polo" finds items in Polo category)
+            { 
+              fabric: { 
+                category: { 
+                  name: { contains: term, mode: "insensitive" } 
+                } 
+              } 
+            }
+          ],
+        }));
+      }
+
       const products = await prisma.product.findMany({
-        take: limit, // Fetch only specific amount
-        skip: skip,  // Skip previous items
-        // --- END CHANGES (Rest remains existing logic) ---
-        where: { isDeleted: false },
+        take: limit,
+        skip: skip,
+        where: whereClause,
         orderBy: [
-          { sortOrder: "desc" }, // Priority 1: Custom Order (High numbers first)
-          { createdAt: "desc" }  // Priority 2: Newest first (Tie-breaker)
+          { sortOrder: "desc" },
+          { createdAt: "desc" } 
         ],
         include: {
           images: true,
@@ -30,8 +65,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
 
-      // Clean up nested Prisma objects for frontend
-      // (This logic remains exactly the same, it just processes fewer items per call now)
       const serializedProducts = products.map((p) => ({
         id: p.id,
         name: p.name,

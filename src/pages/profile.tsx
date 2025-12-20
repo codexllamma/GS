@@ -4,9 +4,10 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { User, Mail, Phone, Calendar, Home, ArrowRight } from "lucide-react";
+import { User, Mail, Phone, Calendar, Home, ArrowRight, LogOut } from "lucide-react"; // Added LogOut
 import { motion } from "framer-motion";
 import Header from "@/components/header";
+import { signOut } from "next-auth/react"; // <--- IMPORT THIS
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
@@ -29,15 +30,16 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center text-gray-600">
-        Loading profile...
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="h-screen flex items-center justify-center text-gray-600">
-        No profile found.
+      <div className="h-screen flex items-center justify-center text-gray-600 gap-4 flex-col">
+        <p>No profile found.</p>
+        <button onClick={() => signOut()} className="text-red-500 underline">Sign out to reset</button>
       </div>
     );
   }
@@ -45,62 +47,62 @@ export default function ProfilePage() {
   return (
     <>
     <Header/>
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-blue-50 px-6 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-blue-50 px-6 py-10 font-apercu">
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-4xl mx-auto bg-white/80 backdrop-blur-xl border border-black/10 rounded-3xl shadow-xl p-10"
+        className="max-w-4xl mx-auto bg-white/80 backdrop-blur-xl border border-black/10 rounded-3xl shadow-xl p-6 md:p-10"
       >
         {/* Avatar */}
         <div className="flex flex-col items-center text-center">
-          <div className="w-32 h-32 rounded-full border border-black/20 bg-black/5 flex items-center justify-center overflow-hidden">
+          <div className="w-32 h-32 rounded-full border border-black/20 bg-black/5 flex items-center justify-center overflow-hidden shadow-sm">
             {user.image ? (
               <Image
                 src={user.image}
                 width={130}
                 height={130}
                 alt="Profile"
-                className="object-cover"
+                className="object-cover w-full h-full"
               />
             ) : (
               <User size={56} className="text-black/40" />
             )}
           </div>
 
-          <h1 className="mt-4 text-3xl font-semibold text-black">
+          <h1 className="mt-4 text-3xl font-bold text-black tracking-tight">
             {user.name || "Unnamed User"}
           </h1>
 
-          <p className="text-xs mt-1 px-3 py-1 rounded-full bg-black text-white uppercase tracking-wide">
+          <p className="text-xs mt-2 px-3 py-1 rounded-full bg-black text-white uppercase tracking-wide font-medium">
             {user.authProvider || "Email Login"}
           </p>
         </div>
 
         {/* Basic Info */}
-        <h2 className="text-xl font-semibold text-black mt-12 mb-4">Account Information</h2>
+        <h2 className="text-xl font-bold text-black mt-12 mb-4">Account Information</h2>
 
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white border border-black rounded-xl p-4 flex items-center gap-4">
-            <Mail size={22} className="text-black" />
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
+            <Mail size={22} className="text-gray-600" />
             <div>
-              <p className="text-xs uppercase text-gray-500">Email</p>
-              <p className="text-lg font-medium">{user.email || "Not Provided"}</p>
+              <p className="text-xs uppercase text-gray-400 font-bold tracking-wider">Email</p>
+              <p className="text-base font-medium">{user.email || "Not Provided"}</p>
             </div>
           </div>
 
-          <div className="bg-white border border-black rounded-xl p-4 flex items-center gap-4">
-            <Phone size={22} className="text-black" />
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
+            <Phone size={22} className="text-gray-600" />
             <div>
-              <p className="text-xs uppercase text-gray-500">Phone</p>
-              <p className="text-lg font-medium">{user.phoneNumber || "Not Provided"}</p>
+              <p className="text-xs uppercase text-gray-400 font-bold tracking-wider">Phone</p>
+              <p className="text-base font-medium">{user.phoneNumber || "Not Provided"}</p>
             </div>
           </div>
 
-          <div className="bg-white border border-black rounded-xl p-4 flex items-center gap-4">
-            <Calendar size={22} className="text-black" />
+          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
+            <Calendar size={22} className="text-gray-600" />
             <div>
-              <p className="text-xs uppercase text-gray-500">Member Since</p>
-              <p className="text-lg font-medium">
+              <p className="text-xs uppercase text-gray-400 font-bold tracking-wider">Member Since</p>
+              <p className="text-base font-medium">
                 {new Date(user.createdAt).toLocaleDateString()}
               </p>
             </div>
@@ -108,47 +110,56 @@ export default function ProfilePage() {
         </div>
 
         {/* Address List */}
-        <h2 className="text-xl font-semibold text-black mt-12 mb-4">Saved Addresses</h2>
+        <h2 className="text-xl font-bold text-black mt-12 mb-4">Saved Addresses</h2>
 
         <div className="space-y-4">
           {user.addresses?.length ? (
             user.addresses.map((addr: any) => (
               <div
                 key={addr.id}
-                className="bg-white border border-black rounded-xl p-5 flex items-start gap-4"
+                className="bg-white border border-gray-200 rounded-xl p-5 flex items-start gap-4 shadow-sm"
               >
-                <Home size={22} className="text-black mt-1" />
+                <Home size={22} className="text-gray-600 mt-1" />
                 <div>
-                  <p className="font-medium text-lg">{addr.line1}</p>
-                  <p className="text-gray-700">
+                  <p className="font-semibold text-lg">{addr.line1}</p>
+                  <p className="text-gray-600">
                     {addr.city}, {addr.state}
                   </p>
-                  <p className="text-gray-700">
+                  <p className="text-gray-600">
                     {addr.country} - {addr.postal}
                   </p>
 
                   {addr.isDefault && (
-                    <span className="mt-2 inline-block text-xs bg-black text-white px-2 py-0.5 rounded">
-                      Default Address
+                    <span className="mt-2 inline-block text-[10px] uppercase font-bold bg-black text-white px-2 py-1 rounded">
+                      Default
                     </span>
                   )}
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-gray-600">No addresses added.</p>
+            <p className="text-gray-500 italic">No addresses added yet.</p>
           )}
         </div>
 
-        {/* Orders */}
-        <div className="text-center mt-12">
+        {/* Actions */}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4 mt-16 pt-8 border-t border-gray-100">
           <Link
             href="/orders/orders-page"
-            className="inline-flex items-center gap-2 px-8 py-3 bg-black text-white rounded-full hover:bg-gray-900 transition text-sm"
+            className="flex items-center gap-2 px-8 py-3 bg-black text-white rounded-full hover:bg-neutral-800 transition font-medium shadow-lg hover:shadow-xl w-full md:w-auto justify-center"
           >
             View Your Orders
             <ArrowRight size={16} />
           </Link>
+
+          {/* SIGN OUT BUTTON */}
+          <button
+            onClick={() => signOut({ callbackUrl: "/" })}
+            className="flex items-center gap-2 px-8 py-3 bg-white text-red-600 border border-red-100 rounded-full hover:bg-red-50 transition font-medium w-full md:w-auto justify-center"
+          >
+            <LogOut size={16} />
+            Log Out
+          </button>
         </div>
       </motion.div>
     </div>

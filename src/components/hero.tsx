@@ -5,6 +5,29 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 
+// --- CONFIGURATION: CATEGORY IMAGES ---
+// Replace these placeholders with your actual image URLs later.
+const CATEGORIES = [
+  { 
+    id: "cat_shirts",
+    name: "Shirts", 
+    image: "https://rzgwffrwwmxtnontocdv.supabase.co/storage/v1/object/public/images/hero/IMG_0393.avif", // <--- PASTE SHIRT URL HERE
+    link: "Shirts"
+  },
+  { 
+    id: "cat_trousers",
+    name: "Trousers", 
+    image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&q=80&w=800", // <--- PASTE TROUSER URL HERE
+    link: "Trousers"
+  },
+  { 
+    id: "cat_polos",
+    name: "Polos", 
+    image: "https://rzgwffrwwmxtnontocdv.supabase.co/storage/v1/object/public/images/hero/IMG_0661.avif", // <--- PASTE POLO URL HERE
+    link: "Polos"
+  }
+];
+
 // --- INTERFACES ---
 export interface Product {
   id: string;
@@ -33,8 +56,6 @@ const preloadImage = (url: string) => {
   });
 };
 
-// --- NEW COMPONENT: ANTI-PIXELATION IMAGE WRAPPER ---
-// This handles the "opacity-0 -> opacity-100" logic for every individual image
 const SmoothImage = (props: ImageProps) => {
   const [isReady, setIsReady] = useState(false);
 
@@ -50,7 +71,6 @@ const SmoothImage = (props: ImageProps) => {
           if (props.onLoad) props.onLoad(e);
         }}
       />
-      {/* Optional: Tiny spinner while the image decodes */}
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50/10">
            <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin"></div>
@@ -61,16 +81,14 @@ const SmoothImage = (props: ImageProps) => {
 };
 
 const Hero = () => {
-  // Products for Grid & Bottom Carousel
+  // Products for Lookbook only now
   const [products, setProducts] = useState<Product[]>([]);
-  // Hero Images for Top Section Background
   const [heroImages, setHeroImages] = useState<string[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
-  // 1. Detect Device
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
@@ -78,11 +96,10 @@ const Hero = () => {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // 2. Fetch Data
   useEffect(() => {
     (async () => {
       try {
-        // A. Fetch Products (For Grid & Bottom Carousel)
+        // A. Fetch Products (Used for Lookbook Carousel)
         const productRes = await fetch("/api/product"); 
         const productData = await productRes.json();
         
@@ -92,16 +109,18 @@ const Hero = () => {
           images: p.images ?? [],
         })) : [];
 
-        // B. Fetch Hero Images (For Top Section Background)
+        // B. Fetch Hero Images (For Top Background)
         const heroRes = await fetch("/api/hero");
         const heroData = await heroRes.json();
         const validHeroImages = Array.isArray(heroData) ? heroData : [];
 
-        // ADAPTIVE PRELOAD (Desktop only)
+        // Preload Logic
         if (!isMobile) {
-          const prodUrls = mappedProducts.slice(0, 3).map((p: Product) => p.images?.[0]?.url).filter(Boolean);
+          // Preload Hero BG
           const heroUrls = validHeroImages.slice(0, 2);
-          await Promise.all([...prodUrls, ...heroUrls].map((url: string) => preloadImage(url)));
+          // Preload Category Images
+          const catUrls = CATEGORIES.map(c => c.image);
+          await Promise.all([...heroUrls, ...catUrls].map((url) => preloadImage(url)));
         }
 
         setProducts(mappedProducts);
@@ -115,7 +134,7 @@ const Hero = () => {
     })();
   }, [isMobile]);
 
-  // 3. Auto-Rotate Top Hero Image
+  // Auto-Rotate Top Hero Image
   useEffect(() => {
     if (heroImages.length <= 1) return;
     const interval = setInterval(() => {
@@ -133,15 +152,12 @@ const Hero = () => {
   }
 
   const activeHeroImage = heroImages.length > 0 ? heroImages[heroIndex] : null;
-  const featuredProducts = products.slice(0, 3);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-blue-50 font-apercu">
 
-      {/* --- TOP SECTION: HERO IMAGE BACKGROUND + TEXT OVERLAY --- */}
+      {/* --- TOP SECTION: BANNER --- */}
       <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-black">
-        
-        {/* Background Slideshow */}
         <AnimatePresence mode="wait">
           {activeHeroImage && (
             <motion.div
@@ -152,25 +168,21 @@ const Hero = () => {
               transition={{ duration: 1.5, ease: "easeInOut" }}
               className="absolute inset-0"
             >
-              {/* Using SmoothImage for Anti-Pixelation on Background */}
               <SmoothImage
                 src={getSafeUrl(activeHeroImage)}
                 alt="Atmosphere"
                 fill
-                className="object-cover" // We control opacity in the wrapper
+                className="object-cover"
                 priority={true}
                 unoptimized={true}
               />
-              {/* Extra Dark Overlay for Text Readability */}
               <div className="absolute inset-0 bg-black/40 pointer-events-none" />
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Gradient Overlay for Text Pop */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30 z-10 pointer-events-none" />
 
-        {/* Text Content */}
         <div className="relative z-20 text-center px-6 max-w-4xl mx-auto">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
@@ -197,60 +209,64 @@ const Hero = () => {
         </div>
       </section>
 
-      {/* --- FEATURED PRODUCTS GRID --- */}
-      <section className="mt-20 px-4 md:px-20">
-        <h2 className="text-3xl font-bold text-black mb-10 text-center tracking-tight">
-          Featured Styles
+      {/* --- REPLACED: SHOP BY CATEGORY (Instead of Products) --- */}
+      <section className="mt-16 px-4 md:px-20">
+        <h2 className="text-2xl md:text-3xl font-bold text-black mb-8 text-center tracking-tight">
+          Shop by Category
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {featuredProducts.map((product) => {
-            const rawUrl = product.images?.[0]?.url;
-            const safeUrl = getSafeUrl(rawUrl) || "https://placehold.co/600x800/png?text=No+Image";
+        {/* MOBILE UX FIX:
+            - 'grid-cols-2': Allows side-by-side items on mobile.
+            - First item gets 'col-span-2' to be the "Hero Category".
+            - Next two items fit side-by-side.
+            - RESULT: All 3 categories fit in one glance.
+        */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-8">
+          {CATEGORIES.map((cat, index) => (
+            <Link 
+              key={cat.id} 
+              href={`/product/products?category=${cat.link}`}
+              className={`
+                group relative overflow-hidden rounded-xl bg-neutral-100 shadow-sm 
+                ${index === 0 ? 'col-span-2 md:col-span-1' : 'col-span-1'}
+                aspect-[4/3] md:aspect-[3/4]
+              `}
+            >
+              {/* Image with Subtle Zoom */}
+              <SmoothImage
+                src={cat.image}
+                alt={cat.name}
+                fill
+                unoptimized={true}
+                priority={!isMobile} // Only prioritize the main ones
+                className="object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
+              />
 
-            return (
-              <motion.div
-                key={product.id}
-                whileHover={{ y: -5 }}
-                className="group flex flex-col backdrop-blur-lg bg-white/70 border border-white/40 rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300"
-              >
-                <div className="relative w-full aspect-[3/4] overflow-hidden bg-neutral-100">
-                  <Link href={`/product/${product.id}`}>
-                    {/* USING SMOOTH IMAGE */}
-                    <SmoothImage
-                      src={safeUrl}
-                      alt={product.name}
-                      fill
-                      unoptimized={true}
-                      priority={!isMobile}
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                      sizes="(max-width: 768px) 100vw, 33vw"
-                    />
-                  </Link>
-                </div>
+              {/* Elegant Dark Overlay 
+                  - Default: slightly dark (to make white text readable)
+                  - Hover: darker (focus effect)
+              */}
+              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-1800" />
 
-                <div className="p-5 flex flex-col gap-2">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-lg font-semibold text-black line-clamp-1">
-                      {product.name}
-                    </h3>
-                    <p className="text-black font-medium">
-                      ₹{product.basePrice}
-                    </p>
-                  </div>
-                  <Link href={`/product/${product.id}`} className="mt-2">
-                    <button className="w-full py-2.5 bg-black text-white text-sm font-medium rounded-lg hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2">
-                      View Product
-                    </button>
-                  </Link>
+              {/* Centered Title (No Buttons) */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+                <h3 className="text-white text-2xl md:text-4xl font-bold tracking-widest uppercase drop-shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform duration-1800">
+                  {cat.name}
+                </h3>
+                
+                {/* Subtle "Shop" text that appears on hover (Desktop) or stays visible (Mobile) */}
+                <div className="overflow-hidden h-0 group-hover:h-auto md:h-0 transition-all duration-1800">
+                   <span className="text-white/90 text-xs md:text-sm font-medium tracking-widest border-b border-white/50 pb-0.5 mt-2 inline-block">
+                     EXPLORE
+                   </span>
                 </div>
-              </motion.div>
-            );
-          })}
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 
-      {/* --- LOOKBOOK CAROUSEL (USING PRODUCT IMAGES) --- */}
+      {/* --- LOOKBOOK CAROUSEL --- */}
       <section className="mt-24 mb-20 px-0 md:px-20 overflow-hidden">
         <h2 className="text-3xl font-bold text-black mb-10 text-center tracking-tight">
           Lookbook
@@ -270,7 +286,6 @@ const Hero = () => {
               repeatType: "loop"
             }}
           >
-            {/* Duplicated for loop */}
             {[...products, ...products].map((product, index) => {
               const rawUrl = product.images?.[0]?.url;
               if (!rawUrl) return null;
@@ -278,7 +293,6 @@ const Hero = () => {
 
               return (
                 <div key={`${product.id}-lookbook-${index}`} className="relative w-[300px] h-[400px] md:w-[400px] md:h-[500px] flex-shrink-0 rounded-2xl overflow-hidden shadow-md bg-gray-100">
-                   {/* USING SMOOTH IMAGE */}
                    <SmoothImage
                     src={safeUrl}
                     alt="Lookbook"
