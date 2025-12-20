@@ -1,33 +1,33 @@
-// pages/profile.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { User, Mail, Phone, Calendar, Home, ArrowRight, LogOut } from "lucide-react"; // Added LogOut
+import { User, Mail, Phone, Calendar, Home, ArrowRight, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
 import Header from "@/components/header";
-import { signOut } from "next-auth/react"; // <--- IMPORT THIS
+import { signOut, useSession } from "next-auth/react"; // <--- Import useSession
+import AuthForm from "@/components/authForm"; // <--- Import your Auth Component
 
 export default function ProfilePage() {
+  const { data: session, status } = useSession(); // <--- Check Auth Status
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
+  // Fetch detailed profile data only when authenticated
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/profile");
-        const data = await res.json();
-        setUser(data.user);
-      } catch (err) {
-        console.error("Profile fetch error", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    if (status === "authenticated") {
+      setLoadingProfile(true);
+      fetch("/api/profile")
+        .then((res) => res.json())
+        .then((data) => setUser(data.user))
+        .catch((err) => console.error("Profile fetch error", err))
+        .finally(() => setLoadingProfile(false));
+    }
+  }, [status]);
 
-  if (loading) {
+  // 1. LOADING STATE (Session or Data)
+  if (status === "loading" || loadingProfile) {
     return (
       <div className="h-screen flex items-center justify-center text-gray-600">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
@@ -35,15 +35,40 @@ export default function ProfilePage() {
     );
   }
 
+  // 2. UNAUTHENTICATED STATE -> SHOW LOGIN FORM (The Fix)
+  if (status === "unauthenticated") {
+    return (
+      <>
+        <Header />
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+          <div className="w-full max-w-md space-y-8">
+             <div className="text-center">
+                <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
+                   Sign in to your account
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                   To view your profile, orders, and saved addresses.
+                </p>
+             </div>
+             {/* Renders the Auth Form we just fixed */}
+             <AuthForm /> 
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // 3. AUTHENTICATED BUT NO DATA (Fallback)
   if (!user) {
     return (
       <div className="h-screen flex items-center justify-center text-gray-600 gap-4 flex-col">
-        <p>No profile found.</p>
-        <button onClick={() => signOut()} className="text-red-500 underline">Sign out to reset</button>
+        <p>Profile unavailable.</p>
+        <button onClick={() => signOut()} className="text-red-500 underline">Sign out</button>
       </div>
     );
   }
 
+  // 4. MAIN PROFILE UI
   return (
     <>
     <Header/>
@@ -152,7 +177,6 @@ export default function ProfilePage() {
             <ArrowRight size={16} />
           </Link>
 
-          {/* SIGN OUT BUTTON */}
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
             className="flex items-center gap-2 px-8 py-3 bg-white text-red-600 border border-red-100 rounded-full hover:bg-red-50 transition font-medium w-full md:w-auto justify-center"

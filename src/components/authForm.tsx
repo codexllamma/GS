@@ -142,7 +142,9 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
 
         {/* PASSWORD */}
         <div className="relative">
-          <Lock className="absolute left-3 top-3 h-5 w-5 text-neutral-400" />
+          {/* 1. Perfect Center for Lock Icon */}
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
+          
           <input
             name="password"
             type={showPassword ? "text" : "password"}
@@ -150,11 +152,14 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
             value={form.password}
             onChange={handleChange}
             required
-            className="w-full pl-10 pr-12 py-3 border rounded-md bg-white/90 focus:ring-1 focus:ring-black outline-none"
+            // 2. Fixed Padding: Changed 'p-10' to 'pl-10 pr-12' so text doesn't hit icons
+            className="w-full pl-10 pr-12 py-3 border rounded-md bg-white/90 focus:ring-1 focus:ring-black outline-none [&::-ms-reveal]:hidden"
           />
+          
           <button
             type="button"
-            className="absolute right-3 top-2.5 text-neutral-500"
+            // 3. Perfect Center for Eye Button
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 p-1 hover:text-black transition"
             onClick={() => setShowPassword((v) => !v)}
           >
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
