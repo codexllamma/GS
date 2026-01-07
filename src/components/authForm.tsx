@@ -58,7 +58,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
 
       // Merge guest cart
       try {
-        await fetch("/api/cart/import-local", {
+        await fetch("/api/cart/merge-after-login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });

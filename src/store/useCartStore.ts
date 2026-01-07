@@ -1,5 +1,21 @@
 import { create } from "zustand";
 import { CartItem } from "@/types/cart";
+import { ProductWithRelations } from "@/types/cart";
+
+const GUEST_PRODUCT: ProductWithRelations = {
+  id: "guest",
+  name: "Item",
+  description: "",
+  basePrice: 0,
+  color: "",
+  fabricId: "",
+  fabric: null,
+  images: [],
+  variants: [],
+  sortOrder: 0,
+  isDeleted: false,
+  createdAt: new Date(),
+};
 
 /*
 -----------------------------------------------------
@@ -59,33 +75,72 @@ export const useCartStore = create<CartStore>((set, get) => ({
   cart: [],
 
   
-  fetchCart: async (isAuth) => {
-  
-
+fetchCart: async (isAuth) => {
   if (!isAuth) {
-    const local = loadGuestCart();
-    set({ cart: local });
+  const guest = loadGuestCart();
+
+  if (!guest.length) {
+    set({ cart: [] });
     return;
   }
 
   try {
+    const res = await fetch("/api/cart/hydrate-guest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        variantIds: guest.map((g) => g.variant.id),
+      }),
+    });
+
+    const data = await res.json();
+
+    const hydrated = guest.map((item) => {
+      const variant = data.variants.find(
+        (v: any) => v.id === item.variant.id
+      );
+
+      return {
+        ...item,
+        variant,
+      };
+    });
+
+    set({ cart: hydrated });
+  } catch (e) {
+    console.error("Guest cart hydration failed", e);
+    set({ cart: [] });
+  }
+
+  return;
+}
+
+
+
+
+  try {
+    
     const res = await fetch("/api/cart");
     if (!res.ok) throw new Error("Failed to fetch cart");
 
     const data = await res.json();
 
-    const normalized = (data?.items || []).map((item: any) => ({
-      id: item.id,
-      quantity: item.quantity,
-      variant: item.variant,
-    }));
+  
+    if (data?.mode === "USER") {
+      set({
+        cart: data.cart?.items ?? [],
+      });
+      saveGuestCart([]);
+      return;
+    }
 
-    set({ cart: normalized });
-    saveGuestCart([]);
+    // Safety fallback
+    set({ cart: [] });
   } catch (error) {
-    console.error(error);
+    console.error("Fetch cart failed:", error);
   }
 },
+
 
 
   
@@ -160,41 +215,41 @@ export const useCartStore = create<CartStore>((set, get) => ({
     }
   },
 
-  /*
-  -----------------------------------------------------
-  UPDATE QUANTITY
-  -----------------------------------------------------
-  */
+  
   updateQuantity: async (cartItemId, quantity, isAuth = false) => {
-    if (!isAuth) {
-      const updated = loadGuestCart().map((c) =>
-        c.id === cartItemId ? { ...c, quantity } : c
-      );
-      saveGuestCart(updated);
-      set({ cart: updated });
-      return;
-    }
+  
+  set((state) => ({
+    cart: state.cart.map((item) =>
+      item.id === cartItemId ? { ...item, quantity } : item
+    ),
+  }));
 
-    try {
-      const res = await fetch("/api/cart", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cartItemId, quantity }),
-      });
+  if (!isAuth) {
+    const updated = loadGuestCart().map((c) =>
+      c.id === cartItemId ? { ...c, quantity } : c
+    );
+    saveGuestCart(updated);
+    return;
+  }
 
-      if (!res.ok) throw new Error("Failed to update quantity");
+  try {
+    const res = await fetch("/api/cart", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cartItemId, quantity }),
+    });
 
-      const updatedItem = await res.json();
+    if (!res.ok) throw new Error("Failed to update quantity");
 
-      set((state) => ({
-        cart: state.cart.map((item) =>
-          item.id === updatedItem.id ? { ...item, quantity: updatedItem.quantity } : item
-        ),
-      }));
-    } catch (error) {
-      console.error("Update quantity failed:", error);
-    }
-  },
+    
+    await get().fetchCart(true);
+  } catch (error) {
+    console.error("Update quantity failed:", error);
+
+    
+    await get().fetchCart(true);
+  }
+},
 
   /*
   -----------------------------------------------------
@@ -252,7 +307,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
     if (!guest.length) return;
 
     try {
-      await fetch("/api/cart/import-local", {
+      await fetch("/api/cart/merge-after-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: guest }),

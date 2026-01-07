@@ -39,13 +39,13 @@ interface Product {
   createdAt: string;
 }
 
-// --- HELPER: Fix Supabase URLs ---
+
 const getSafeUrl = (url: string) => {
   if (!url) return "";
   return url.replace(/ /g, "%20");
 };
 
-// --- HELPER: Preload Image (Promise Barrier) ---
+
 const preloadImage = (url: string) => {
   return new Promise((resolve) => {
     if (!url) { resolve(true); return; }
@@ -56,7 +56,28 @@ const preloadImage = (url: string) => {
   });
 };
 
-// --- SERVER SIDE PROPS ---
+// --- HELPER: Guest Cart (LOCAL STORAGE) ---
+const addToGuestCart = (variantId: string, quantity = 1) => {
+  const raw = localStorage.getItem("guest_cart");
+  const items = raw ? JSON.parse(raw) : [];
+
+  const existing = items.find(
+    (i: any) => i.variant?.id === variantId
+  );
+
+  if (existing) {
+    existing.quantity += quantity;
+  } else {
+    items.push({
+      variant: { id: variantId },
+      quantity,
+    });
+  }
+
+  localStorage.setItem("guest_cart", JSON.stringify(items));
+};
+
+
 export const getServerSideProps: GetServerSideProps<{ product: Product | null }> = async (
   context: GetServerSidePropsContext
 ) => {
@@ -153,37 +174,47 @@ export default function ProductDetailsPage({ product }: InferGetServerSidePropsT
     setCurrentImage(idx);
   };
 
-  // --- ADD TO CART ---
+  
   const handleAddToCart = async () => {
-    if (!selectedSize) {
-      alert("Please choose a size");
+  if (!selectedSize) {
+    alert("Please choose a size");
+    return;
+  }
+
+  try {
+    const variant = product?.variants.find((v) => v.size === selectedSize);
+    if (!variant) throw new Error("Variant not found");
+
+    const response = await fetch("/api/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        variantId: variant.id,
+        quantity: 1,
+      }),
+    });
+
+    const data = await response.json();
+
+    
+    if (data?.mode === "GUEST") {
+      addToGuestCart(variant.id, 1);
+      setAdded(true);
       return;
     }
 
-    try {
-      const variant = product?.variants.find((v) => v.size === selectedSize);
-      if (!variant) throw new Error("Variant not found");
-
-      const response = await fetch("/api/cart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          variantId: variant.id,
-          quantity: 1,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || "Failed to add to cart");
-      }
-
-      setAdded(true);
-    } catch (error: any) {
-      console.error("Add to cart error:", error);
-      alert(error.message || "Could not add item to cart.");
+    
+    if (!response.ok) {
+      throw new Error(data?.message || "Failed to add to cart");
     }
-  };
+
+    setAdded(true);
+  } catch (error: any) {
+    console.error("Add to cart error:", error);
+    alert(error.message || "Could not add item to cart.");
+  }
+};
+
 
   if (isLoading || !product) {
     return (

@@ -1,29 +1,32 @@
 "use client";
+
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/router";
 import AuthForm from "./authForm";
 import { useAuthModal } from "@/store/useAuthModal";
+import { handlePostLogin } from "@/lib/handlePostLogin";
 
 const AuthModal = () => {
   const { isOpen, close } = useAuthModal();
+  const router = useRouter();
+
+  const onSuccess = async () => {
+    close();
+    await handlePostLogin(router);
+  };
 
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-md"
+          className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center"
           onClick={close}
         >
           <motion.div
-            initial={{ scale: 0.92, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.92, opacity: 0 }}
-            className="bg-white w-full max-w-md mx-4 rounded-2xl p-6 shadow-2xl relative"
+            className="bg-white rounded-2xl p-6 w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
-            <AuthForm onSuccess={close} />
+            <AuthForm onSuccess={onSuccess} />
           </motion.div>
         </motion.div>
       )}
