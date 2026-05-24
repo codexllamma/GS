@@ -8,6 +8,7 @@ import { useCartStore } from "@/store/useCartStore";
 import Footer from "@/components/footer";
 import { useRouter } from "next/router";
 import AuthModal from "@/components/authModal";
+import { Toaster } from "react-hot-toast";
 
 function ClientHydrationWrapper({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -88,7 +89,7 @@ export default function App({
 
         {/* Actual page */}
         <Component {...pageProps} />
-
+        <Toaster position="top-center" />
         {/* Global Auth Modal */}
         <AuthModal />
 

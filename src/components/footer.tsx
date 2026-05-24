@@ -31,18 +31,14 @@ export default function Footer() {
             ĦIÈR
           </h2>
           <p className="text-gray-400 mb-4 leading-relaxed">
-            
-            To wear   <span className="font-saira">
-                   ĦIÈR
-              </span> is to wear heritage-
-            a signature of discretion, 
-            a silent emblem of belonging to the few who truly know.
+    
+            is built on the belief that true style never announces itself
           </p>
           <div className="flex space-x-4">
             {[Instagram, Facebook].map((Icon, i) => (
               <motion.a
                 key={i}
-                href="#"
+                href="https://www.facebook.com/share/1EHTdmoUvz/"
                 whileHover={{ scale: 1.15 }}
                 whileTap={{ scale: 0.95 }}
                 className="text-gray-400 hover:text-amber-400 transition-colors duration-300"

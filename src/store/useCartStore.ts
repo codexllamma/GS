@@ -1,21 +1,8 @@
 import { create } from "zustand";
-import { CartItem } from "@/types/cart";
+import { CartItem,GuestCartItem } from "@/types/cart";
 import { ProductWithRelations } from "@/types/cart";
+import toast from "react-hot-toast";
 
-const GUEST_PRODUCT: ProductWithRelations = {
-  id: "guest",
-  name: "Item",
-  description: "",
-  basePrice: 0,
-  color: "",
-  fabricId: "",
-  fabric: null,
-  images: [],
-  variants: [],
-  sortOrder: 0,
-  isDeleted: false,
-  createdAt: new Date(),
-};
 
 /*
 -----------------------------------------------------
@@ -25,17 +12,28 @@ const GUEST_PRODUCT: ProductWithRelations = {
 
 const GUEST_KEY = "guest_cart";
 
-const loadGuestCart = (): CartItem[] => {
+const loadGuestCart = (): GuestCartItem[] => {
   try {
+
     if (typeof window === "undefined") return [];
+
     const raw = localStorage.getItem(GUEST_KEY);
-    return raw ? JSON.parse(raw) : [];
+
+    const parsed = raw ? JSON.parse(raw) : [];
+
+    return parsed.filter(
+      (item: any) =>
+        item &&
+        typeof item.variantId === "string" &&
+        typeof item.quantity === "number"
+    );
+
   } catch {
     return [];
   }
 };
 
-const saveGuestCart = (cart: CartItem[]) => {
+const saveGuestCart = (cart: GuestCartItem[]) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(GUEST_KEY, JSON.stringify(cart));
 };
@@ -76,68 +74,96 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   
 fetchCart: async (isAuth) => {
+
+  // -------------------------
+  // GUEST FLOW
+  // -------------------------
   if (!isAuth) {
-  const guest = loadGuestCart();
 
-  if (!guest.length) {
-    set({ cart: [] });
-    return;
-  }
+    const guest = loadGuestCart();
 
-  try {
-    const res = await fetch("/api/cart/hydrate-guest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        variantIds: guest.map((g) => g.variant.id),
-      }),
-    });
-
-    const data = await res.json();
-
-    const hydrated = guest.map((item) => {
-      const variant = data.variants.find(
-        (v: any) => v.id === item.variant.id
-      );
-
-      return {
-        ...item,
-        variant,
-      };
-    });
-
-    set({ cart: hydrated });
-  } catch (e) {
-    console.error("Guest cart hydration failed", e);
-    set({ cart: [] });
-  }
-
-  return;
-}
-
-
-
-
-  try {
-    
-    const res = await fetch("/api/cart");
-    if (!res.ok) throw new Error("Failed to fetch cart");
-
-    const data = await res.json();
-
-  
-    if (data?.mode === "USER") {
-      set({
-        cart: data.cart?.items ?? [],
-      });
-      saveGuestCart([]);
+    if (!guest.length) {
+      set({ cart: [] });
       return;
     }
 
-    // Safety fallback
+    try {
+
+      const res = await fetch("/api/cart/hydrate-guest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          variantIds: guest.map((g) => g.variantId),
+        }),
+      });
+
+      const data = await res.json();
+
+      console.log("HYDRATE RESPONSE:", data);
+
+      const hydrated: CartItem[] = guest
+        .map((item) => {
+
+          const variant = data.variants.find(
+            (v: any) => v.id === item.variantId
+          );
+
+          // variant deleted / stale localStorage
+          if (!variant) return null;
+
+          return {
+            id: item.variantId,
+            quantity: item.quantity,
+            variant,
+          };
+        })
+        .filter(Boolean) as CartItem[];
+
+      set({ cart: hydrated });
+
+    } catch (e) {
+
+      console.error("Guest cart hydration failed", e);
+
+      set({ cart: [] });
+    }
+
+    return;
+  }
+
+  // -------------------------
+  // AUTH USER FLOW
+  // -------------------------
+  try {
+
+    const res = await fetch("/api/cart");
+
+    if (!res.ok) {
+      throw new Error("Failed to fetch cart");
+    }
+
+    const data = await res.json();
+
+    if (data?.mode === "USER") {
+
+      set({
+        cart: data.cart?.items ?? [],
+      });
+
+      saveGuestCart([]);
+
+      return;
+    }
+
     set({ cart: [] });
+
   } catch (error) {
+
     console.error("Fetch cart failed:", error);
+
+    set({ cart: [] });
   }
 },
 
@@ -146,29 +172,83 @@ fetchCart: async (isAuth) => {
   
   addToCart: async (variantId, quantity = 1, isAuth = false) => {
     if (!isAuth) {
-      const cur = loadGuestCart();
-      const existing = cur.find((c) => c.variant.id === variantId);
 
-      let updated: CartItem[];
-      if (existing) {
-        updated = cur.map((c) =>
-          c.variant.id === variantId ? { ...c, quantity: c.quantity + quantity } : c
-        );
-      } else {
-        updated = [
-          ...cur,
-          {
-            id: crypto.randomUUID(),
-            quantity,
-            variant: { id: variantId } as any,
-          },
-        ];
-      }
+  const cur = loadGuestCart();
 
-      saveGuestCart(updated);
-      set({ cart: updated });
-      return;
-    }
+  const existing = cur.find(
+    (c) => c.variantId === variantId
+  );
+
+  let updated: GuestCartItem[];
+
+  if (existing) {
+
+  const hydratedItem = get().cart.find(
+    (item) => item.variant.id === variantId
+  );
+
+  if (!hydratedItem) {
+    toast.error("Item unavailable");
+    return;
+  }
+
+  const availableStock =
+    hydratedItem.variant.stock;
+
+  const newQuantity =
+    existing.quantity + quantity;
+
+  if (newQuantity > availableStock) {
+
+    toast.error(
+      `Only ${availableStock} items available`
+    );
+
+    return;
+  }
+
+  updated = cur.map((c) =>
+    c.variantId === variantId
+      ? {
+          ...c,
+          quantity: newQuantity,
+        }
+      : c
+  );
+
+} else {
+
+
+  const hydratedItem = get().cart.find(
+  (item) => item.variant.id === variantId
+);
+
+if (
+  hydratedItem &&
+  quantity > hydratedItem.variant.stock
+) {
+
+  toast.error(
+    `Only ${hydratedItem.variant.stock} items available`
+  );
+
+  return;
+}
+  updated = [
+    ...cur,
+    {
+      variantId,
+      quantity,
+    },
+  ];
+}
+
+  saveGuestCart(updated);
+
+  await get().fetchCart(false);
+
+  return;
+}
 
     try {
       const res = await fetch("/api/cart", {
@@ -192,11 +272,17 @@ fetchCart: async (isAuth) => {
   */
   removeFromCart: async (cartItemId, isAuth = false) => {
     if (!isAuth) {
-      const updated = loadGuestCart().filter((c) => c.id !== cartItemId);
-      saveGuestCart(updated);
-      set({ cart: updated });
-      return;
-    }
+
+  const updated = loadGuestCart().filter(
+    (c) => c.variantId !== cartItemId
+  );
+
+  saveGuestCart(updated);
+
+  await get().fetchCart(false);
+
+  return;
+}
 
     try {
       const res = await fetch("/api/cart", {
@@ -218,19 +304,43 @@ fetchCart: async (isAuth) => {
   
   updateQuantity: async (cartItemId, quantity, isAuth = false) => {
   
-  set((state) => ({
-    cart: state.cart.map((item) =>
-      item.id === cartItemId ? { ...item, quantity } : item
-    ),
-  }));
-
   if (!isAuth) {
-    const updated = loadGuestCart().map((c) =>
-      c.id === cartItemId ? { ...c, quantity } : c
-    );
-    saveGuestCart(updated);
-    return;
-  }
+
+    const hydratedItem = get().cart.find(
+  (item) => item.id === cartItemId
+);
+
+if (!hydratedItem) {
+  toast.error("Item unavailable");
+  return;
+}
+
+const availableStock =
+  hydratedItem.variant.stock;
+
+if (quantity > availableStock) {
+
+  toast.error(
+    `Only ${availableStock} items available`
+  );
+
+  return;
+}
+  const updated = loadGuestCart().map((c) =>
+    c.variantId === cartItemId
+      ? {
+          ...c,
+          quantity,
+        }
+      : c
+  );
+
+  saveGuestCart(updated);
+
+  await get().fetchCart(false);
+
+  return;
+}
 
   try {
     const res = await fetch("/api/cart", {
@@ -239,14 +349,27 @@ fetchCart: async (isAuth) => {
       body: JSON.stringify({ cartItemId, quantity }),
     });
 
-    if (!res.ok) throw new Error("Failed to update quantity");
+    const data = await res.json();
 
-    
-    await get().fetchCart(true);
+    if (!res.ok) {
+      toast.error(data?.message || "Failed to update quantity");
+
+      await get().fetchCart(true);
+
+      return;
+    }
+
+    set((state) => ({
+    cart: state.cart.map((item) =>
+      item.id === cartItemId ? data.item : item
+    ),
+    }));
+
   } catch (error) {
     console.error("Update quantity failed:", error);
 
-    
+    toast.error("Something went wrong");
+
     await get().fetchCart(true);
   }
 },
@@ -258,13 +381,22 @@ fetchCart: async (isAuth) => {
   */
   updateVariant: async (cartItemId, variantId, isAuth = false) => {
     if (!isAuth) {
-      const updated = loadGuestCart().map((c) =>
-        c.id === cartItemId ? { ...c, variant: { id: variantId } as any } : c
-      );
-      saveGuestCart(updated);
-      set({ cart: updated });
-      return;
-    }
+
+  const updated = loadGuestCart().map((c) =>
+    c.variantId === cartItemId
+      ? {
+          ...c,
+          variantId,
+        }
+      : c
+  );
+
+  saveGuestCart(updated);
+
+  await get().fetchCart(false);
+
+  return;
+}
 
     try {
       const res = await fetch("/api/cart", {
@@ -275,11 +407,12 @@ fetchCart: async (isAuth) => {
 
       if (!res.ok) throw new Error("Failed to update variant");
 
-      const updatedItem = await res.json();
+      const data = await res.json();
+      const updatedVariantItem = data.item;
 
       set((state) => ({
         cart: state.cart.map((item) =>
-          item.id === cartItemId ? updatedItem : item
+          item.id === cartItemId ? updatedVariantItem : item
         ),
       }));
     } catch (error) {

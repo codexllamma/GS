@@ -27,7 +27,7 @@ export default function CookiePolicy() {
         <h2>4. Contact</h2>
         <p>
           For privacy inquiries:{" "}
-          <a href="mailto:privacy@hier.in">privacy@hier.in</a>
+          <a>support@hièr.store</a>
         </p>
       </section>
     </LegalLayout>

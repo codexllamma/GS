@@ -74,75 +74,264 @@ export default function CheckoutPage() {
      CHECKOUT HANDLER (HARD GUARDED)
      =============================== */
   const handleCheckout = async () => {
-    if (!session) {
-      localStorage.setItem("redirectIntent", "/checkout");
-      openAuthModal();
-      return;
-    }
 
-    if (!address.line1 || !address.city || !address.state || !address.postal) {
-      alert("Please fill in all required address fields.");
-      return;
-    }
+  // -------------------------
+  // AUTH CHECK
+  // -------------------------
 
-    try {
-      const res = await fetch("/api/checkout", {
+  if (!session) {
+
+    localStorage.setItem(
+      "redirectIntent",
+      "/checkout"
+    );
+
+    openAuthModal();
+
+    return;
+  }
+
+  // -------------------------
+  // ADDRESS VALIDATION
+  // -------------------------
+
+  if (
+    !address.line1 ||
+    !address.city ||
+    !address.state ||
+    !address.postal
+  ) {
+
+    alert(
+      "Please fill in all required address fields."
+    );
+
+    return;
+  }
+
+  try {
+
+    // -------------------------
+    // CREATE ORDER
+    // -------------------------
+
+    const res = await fetch(
+      "/api/checkout",
+      {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, paymentMethod }),
-      });
 
-      if (res.status === 401) {
-        localStorage.setItem("redirectIntent", "/checkout");
-        openAuthModal();
-        return;
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify({
+          address,
+          paymentMethod,
+        }),
       }
+    );
 
-      if (!res.ok) throw new Error("Checkout failed");
+    // -------------------------
+    // SESSION EXPIRED
+    // -------------------------
 
-      const data = await res.json();
-      const order = data.order;
+    if (res.status === 401) {
 
-      if (paymentMethod === "RAZORPAY") {
-        await loadRazorpay();
+      localStorage.setItem(
+        "redirectIntent",
+        "/checkout"
+      );
 
-        const rzp = new (window as any).Razorpay({
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-          amount: data.razorpayOrder.amount,
+      openAuthModal();
+
+      return;
+    }
+
+    // -------------------------
+    // CHECKOUT FAILURE
+    // -------------------------
+
+    const data = await res.json();
+
+    if (!res.ok) {
+
+      throw new Error(
+        data?.message ||
+        "Checkout failed"
+      );
+    }
+
+    const order = data.order;
+
+    // =====================================================
+    // RAZORPAY FLOW
+    // =====================================================
+
+    if (
+      paymentMethod === "RAZORPAY"
+    ) {
+
+      await loadRazorpay();
+
+      const rzp =
+        new (window as any).Razorpay({
+
+          key:
+            process.env
+              .NEXT_PUBLIC_RAZORPAY_KEY_ID,
+
+          amount:
+            data.razorpayOrder.amount,
+
           currency: "INR",
-          name: "Your Store",
-          description: "Order Payment",
-          order_id: data.razorpayOrder.id,
-          handler: async (response: any) => {
-            await fetch("/api/razorpay/verify-payment", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                orderId: order.id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpayOrderId: response.razorpay_order_id,
-                razorpaySignature: response.razorpay_signature,
-              }),
-            });
 
-            router.push(`/order-confirmation/${order.id}`);
+          name: "Your Store",
+
+          description:
+            "Order Payment",
+
+          order_id:
+            data.razorpayOrder.id,
+
+          // -------------------------
+          // PAYMENT SUCCESS
+          // -------------------------
+
+          handler: async (
+            response: any
+          ) => {
+
+            try {
+
+              // -------------------------
+              // VERIFY PAYMENT
+              // -------------------------
+
+              const verifyRes =
+                await fetch(
+                  "/api/razorpay/verify-payment",
+                  {
+
+                    method: "POST",
+
+                    headers: {
+                      "Content-Type":
+                        "application/json",
+                    },
+
+                    body: JSON.stringify({
+
+                      orderId:
+                        order.id,
+
+                      razorpayPaymentId:
+                        response
+                          .razorpay_payment_id,
+
+                      razorpayOrderId:
+                        response
+                          .razorpay_order_id,
+
+                      razorpaySignature:
+                        response
+                          .razorpay_signature,
+                    }),
+                  }
+                );
+
+              const verifyData =
+                await verifyRes.json();
+
+              // -------------------------
+              // VERIFY FAILED
+              // -------------------------
+
+              if (!verifyRes.ok) {
+
+                alert(
+                  verifyData?.message ||
+                  "Payment verification failed"
+                );
+
+                return;
+              }
+
+              // -------------------------
+              // SUCCESS
+              // -------------------------
+
+              router.push(
+                `/order-confirmation/${order.id}`
+              );
+
+            } catch (err) {
+
+              console.error(
+                "Verification failed:",
+                err
+              );
+
+              alert(
+                "Payment verification failed"
+              );
+            }
           },
+
+          // -------------------------
+          // PAYMENT FAILED / CLOSED
+          // -------------------------
+
+          modal: {
+
+            ondismiss: () => {
+
+              console.log(
+                "Razorpay popup closed"
+              );
+            },
+          },
+
           prefill: {
-            name: session.user?.name,
-            email: session.user?.email,
+
+            name:
+              session.user?.name || "",
+
+            email:
+              session.user?.email || "",
           },
-          theme: { color: "#000000" },
+
+          theme: {
+            color: "#000000",
+          },
         });
 
-        rzp.open();
-      } else {
-        router.push(`/order-confirmation/${order.id}`);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Checkout failed.");
+      rzp.open();
+
+      return;
     }
-  };
+
+    // =====================================================
+    // COD FLOW
+    // =====================================================
+
+    router.push(
+      `/order-confirmation/${order.id}`
+    );
+
+  } catch (err: any) {
+
+    console.error(
+      "Checkout failed:",
+      err
+    );
+
+    alert(
+      err?.message ||
+      "Checkout failed."
+    );
+  }
+};
 
   /* ===============================
      LOADING STATE

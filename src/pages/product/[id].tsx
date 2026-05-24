@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useSession } from "next-auth/react";
 import { GetServerSideProps, GetServerSidePropsContext, InferGetServerSidePropsType } from "next";
 import { ShoppingBag, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { AnimatePresence, motion } from "framer-motion";
 import Header from "@/components/header";
 import Link from "next/link";
-
+import toast from "react-hot-toast";
+import { useCartStore } from "@/store/useCartStore";
 // --- INTERFACES ---
 interface ProductImage {
   url: string;
@@ -56,27 +58,6 @@ const preloadImage = (url: string) => {
   });
 };
 
-// --- HELPER: Guest Cart (LOCAL STORAGE) ---
-const addToGuestCart = (variantId: string, quantity = 1) => {
-  const raw = localStorage.getItem("guest_cart");
-  const items = raw ? JSON.parse(raw) : [];
-
-  const existing = items.find(
-    (i: any) => i.variant?.id === variantId
-  );
-
-  if (existing) {
-    existing.quantity += quantity;
-  } else {
-    items.push({
-      variant: { id: variantId },
-      quantity,
-    });
-  }
-
-  localStorage.setItem("guest_cart", JSON.stringify(items));
-};
-
 
 export const getServerSideProps: GetServerSideProps<{ product: Product | null }> = async (
   context: GetServerSidePropsContext
@@ -110,14 +91,16 @@ export default function ProductDetailsPage({ product }: InferGetServerSidePropsT
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [currentImage, setCurrentImage] = useState(0);
   const [added, setAdded] = useState(false);
-  
+  const { status } = useSession();
   // --- LOADING STATES ---
   const [isLoading, setIsLoading] = useState(true); 
   const [isMobile, setIsMobile] = useState(false);
   
   // --- IMAGE FADE STATE ---
   const [isImageReady, setIsImageReady] = useState(false);
-
+  const addToCart = useCartStore(
+  (state) => state.addToCart
+  );
   // 1. Detect Mobile
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -176,42 +159,45 @@ export default function ProductDetailsPage({ product }: InferGetServerSidePropsT
 
   
   const handleAddToCart = async () => {
+
+  
   if (!selectedSize) {
-    alert("Please choose a size");
+    toast.error("Please choose a size");
     return;
   }
 
   try {
-    const variant = product?.variants.find((v) => v.size === selectedSize);
-    if (!variant) throw new Error("Variant not found");
-
-    const response = await fetch("/api/cart", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        variantId: variant.id,
-        quantity: 1,
-      }),
-    });
-
-    const data = await response.json();
 
     
-    if (data?.mode === "GUEST") {
-      addToGuestCart(variant.id, 1);
-      setAdded(true);
-      return;
+    const isAuth =
+  status === "authenticated";
+    const variant = product?.variants.find(
+      (v) => v.size === selectedSize
+    );
+
+    if (!variant) {
+      throw new Error("Variant not found");
     }
 
-    
-    if (!response.ok) {
-      throw new Error(data?.message || "Failed to add to cart");
-    }
+    await addToCart(
+      variant.id,
+      1,
+      isAuth
+    );
 
     setAdded(true);
+
   } catch (error: any) {
-    console.error("Add to cart error:", error);
-    alert(error.message || "Could not add item to cart.");
+
+    console.error(
+      "Add to cart error:",
+      error
+    );
+
+    toast.error(
+      error.message ||
+      "Could not add item to cart."
+    );
   }
 };
 

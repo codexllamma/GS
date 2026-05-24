@@ -118,7 +118,7 @@ export default async function handler(
       ],
     };
 
-    console.log("📦 XpressBees Payload:", JSON.stringify(payload, null, 2));
+    console.log("XpressBees Payload:", JSON.stringify(payload, null, 2));
 
     // 4. Call XpressBees API
     const resp = await axios.post(

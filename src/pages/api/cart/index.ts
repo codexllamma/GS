@@ -66,14 +66,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { cartId: cart.id, variantId },
       });
 
-      if (existingItem) {
-        const updated = await prisma.cartItem.update({
-          where: { id: existingItem.id },
-          data: { quantity: existingItem.quantity + quantity },
-        });
+  if (existingItem) {
 
-        return res.status(200).json({ mode: "USER", item: updated });
-      }
+  const variant = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    select: { stock: true },
+  });
+
+  if (!variant) {
+    return res.status(404).json({ message: "Variant not found" });
+  }
+
+  const newQuantity = existingItem.quantity + quantity;
+
+  // Prevent quantity below 1
+  if (newQuantity < 1) {
+    return res.status(400).json({
+      message: "Quantity cannot be less than 1",
+    });
+  }
+
+  // Prevent exceeding stock
+  if (newQuantity > variant.stock) {
+    return res.status(400).json({
+      message: `Item already in cart.Only ${variant.stock} items available in stock`,
+    });
+  }
+
+  const updated = await prisma.cartItem.update({
+    where: { id: existingItem.id },
+    data: { quantity: newQuantity },
+  });
+
+  return res.status(200).json({
+    mode: "USER",
+    item: updated,
+  });
+}
 
       const newItem = await prisma.cartItem.create({
         data: {
@@ -101,31 +130,117 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (quantity != null) {
-        const updatedItem = await prisma.cartItem.update({
-          where: { id: cartItemId },
-          data: { quantity },
-        });
 
-        return res.status(200).json({ mode: "USER", item: updatedItem });
-      }
+  if (!Number.isInteger(quantity)) {
+    return res.status(400).json({
+      message: "Quantity must be an integer",
+    });
+  }
 
-      if (variantId) {
+  if (quantity < 1) {
+    return res.status(400).json({
+      message: "Quantity must be at least 1",
+    });
+  }
+
+  const cartItem = await prisma.cartItem.findUnique({
+    where: { id: cartItemId },
+    include: {
+      variant: true,
+    },
+  });
+
+  if (!cartItem) {
+    return res.status(404).json({
+      message: "Cart item not found",
+    });
+  }
+
+  const availableStock = cartItem.variant.stock;
+
+  if (quantity > availableStock) {
+    return res.status(400).json({
+      message: `Only ${availableStock} items available in stock`,
+    });
+  }
+
+  const updatedItem = await prisma.cartItem.update({
+  where: { id: cartItemId },
+  data: { quantity },
+
+  include: {
+    variant: {
+      include: {
+        product: {
+          include: {
+            images: true,
+            variants: true,
+            fabric: {
+                include: {
+                  category: true,
+                },
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
+  return res.status(200).json({
+    mode: "USER",
+    item: updatedItem,
+  });
+}
+
+if (variantId) {
+        const existingCartItem = await prisma.cartItem.findUnique({
+  where: { id: cartItemId },
+});
+
+if (!existingCartItem) {
+  return res.status(404).json({
+    message: "Cart item not found",
+  });
+}
+
+const newVariant = await prisma.productVariant.findUnique({
+  where: { id: variantId },
+});
+
+if (!newVariant) {
+  return res.status(404).json({
+    message: "Variant not found",
+  });
+}
+
+if (existingCartItem.quantity > newVariant.stock) {
+  return res.status(400).json({
+    message: `Only ${newVariant.stock} items available for this size`,
+  });
+}
+
         const updatedVariantItem = await prisma.cartItem.update({
           where: { id: cartItemId },
           data: { variantId },
           include: {
-            variant: {
-              include: {
-                product: {
-                  include: {
-                    images: true,
-                    variants: true,
-                  },
+    variant: {
+      include: {
+        product: {
+          include: {
+            images: true,
+            variants: true,
+            fabric: {
+                include: {
+                  category: true,
                 },
-              },
             },
           },
-        });
+        },
+      },
+    },
+  },
+});
 
         return res.status(200).json({ mode: "USER", item: updatedVariantItem });
       }

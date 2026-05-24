@@ -7,7 +7,7 @@ export default function Terms() {
       <section>
         <h2>3.1 Acceptance</h2>
         <p>
-          By using hier™, you agree to comply with these Terms. If you disagree, refrain
+          By using hièr, you agree to comply with these Terms. If you disagree, refrain
           from using the Website.
         </p>
 
@@ -20,7 +20,7 @@ export default function Terms() {
 
         <h2>3.4 Intellectual Property</h2>
         <p>
-          All hier™ content and trademarks are owned by THKR Futuretech Pvt. Ltd.
+          All hièr content and trademarks are owned by THKR Futuretech Pvt. Ltd.
           Unauthorized use is prohibited.
         </p>
 

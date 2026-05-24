@@ -15,3 +15,8 @@ export interface CartItem {
   quantity: number;
   variant: CartVariant;
 }
+
+export interface GuestCartItem {
+  variantId: string;
+  quantity: number;
+}

@@ -44,7 +44,7 @@ export default function PrivacyPolicy() {
         <h2>2.6 Legal Basis & User Rights</h2>
         <p>
           Users can request access, correction, or deletion of their data via{" "}
-          <a href="mailto:privacy@hier.in">privacy@hier.in</a>.
+          <a>support@hièr.store</a>.
         </p>
 
         <h2>2.7 Retention & Updates</h2>

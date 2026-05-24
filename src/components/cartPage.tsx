@@ -31,9 +31,18 @@ const CartPage: React.FC = () => {
 
   const items = cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cart.reduce(
-    (sum, item) => sum + item.quantity * (item.variant?.product?.basePrice || 0),
-    0
-  );
+  (sum, item) => {
+
+    const price =
+      item.variant?.price &&
+      item.variant.price > 0
+        ? item.variant.price
+        : item.variant?.product?.basePrice || 0;
+
+    return sum + item.quantity * price;
+  },
+  0
+);
 
   /*
   -----------------------------------------------------------
@@ -201,7 +210,13 @@ const CartPage: React.FC = () => {
                         </div>
 
                         <p className="text-lg sm:text-xl font-medium text-neutral-900 mt-2 sm:mt-3">
-                          ₹{product.basePrice.toLocaleString()}
+                          ₹{
+                            (
+                              (item.variant.price ?? 0) > 0
+                                ? item.variant.price!
+                                : product.basePrice
+                            ).toLocaleString()
+                          }
                         </p>
 
                         {/* QTY + REMOVE */}

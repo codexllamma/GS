@@ -214,7 +214,7 @@ export default function AdminOrders() {
 
                                 <div className="flex items-center gap-2 w-full sm:w-auto">
                                    <button
-                                      onClick={() => handleShipmentAction("/api/admin/shipments/create", {
+                                      onClick={() => handleShipmentAction("/api/admin/shipment/create", {
                                          orderId: order.id,
                                          orderItemId: item.id,
                                          sequenceIndex: unitIdx
