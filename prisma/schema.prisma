@@ -113,6 +113,8 @@ model Product {
   variants   ProductVariant[]
   images     ProductImage[]
   orderItems OrderItem[]
+
+  shopifyMapping ShopifyProductMapping?
   
 
   @@index([fabricId])
@@ -129,6 +131,8 @@ model ProductVariant {
   product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems CartItem[]
   orderItems OrderItem[]
+
+  shopifyMapping ShopifyVariantMapping?
 
   @@unique([productId, size])
 }
@@ -187,6 +191,8 @@ model Order {
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   address    Address     @relation(fields: [addressId], references: [id])
   orderItems OrderItem[]
+
+  shopifyMapping ShopifyOrderMapping?
 }
 
 model OrderItem {
@@ -259,6 +265,47 @@ model ShipmentEvent {
   createdAt   DateTime  @default(now())
 
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+}
+
+model ShopifyProductMapping {
+  id               String   @id @default(uuid())
+  productId        String   @unique
+  shopifyProductId String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shopifyProductId])
+}
+
+model ShopifyVariantMapping {
+  id                String   @id @default(uuid())
+  variantId         String   @unique
+  shopifyVariantId  String
+  inventoryItemId   String
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shopifyVariantId])
+  @@index([inventoryItemId])
+}
+
+model ShopifyOrderMapping {
+  id              String   @id @default(uuid())
+  orderId         String   @unique
+  shopifyOrderId  String
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shopifyOrderId])
 }
 
 

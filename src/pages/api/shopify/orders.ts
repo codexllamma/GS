@@ -1,8 +1,6 @@
-
-
 import type { NextApiRequest, NextApiResponse } from "next";
 
-import { syncProduct } from "@/lib/shopify/sync/products";
+import { syncOrder } from "@/lib/shopify/sync/orders";
 
 export default async function handler(
   req: NextApiRequest,
@@ -15,17 +13,17 @@ export default async function handler(
   }
 
   try {
-    const { productId } = req.body;
+    const { orderId } = req.body;
 
-    if (!productId) {
+    if (!orderId) {
       return res.status(400).json({
-        error: "productId is required",
+        error: "orderId is required",
       });
     }
 
-    const product = await syncProduct(productId);
+    const order = await syncOrder(orderId);
 
-    return res.status(200).json(product);
+    return res.status(200).json(order);
   } catch (error) {
     console.error(error);
 
@@ -33,7 +31,7 @@ export default async function handler(
       error:
         error instanceof Error
           ? error.message
-          : "Failed to synchronize product.",
+          : "Failed to synchronize order.",
     });
   }
 }

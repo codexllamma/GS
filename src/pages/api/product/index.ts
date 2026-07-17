@@ -65,6 +65,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
 
+      
+
       const serializedProducts = products.map((p) => ({
         id: p.id,
         name: p.name,
