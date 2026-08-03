@@ -4,32 +4,50 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")   
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
+  id            String    @id @default(cuid())
+  name          String?
+  password      String?
+  email         String?   @unique
+  emailVerified DateTime?
+  phoneNumber   String?   @unique
+  phoneVerified Boolean   @default(false)
+  image         String?
+  authProvider  String?
+  isAdmin       Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses        Address[]
+  accounts         Account[]
+  carts            Cart[]
+  orders           Order[]
+  sessions         Session[]
+  checkoutSessions CheckoutSession[]
+
+  @@index([email])
+}
+
+model CheckoutSession {
   id              String   @id @default(cuid())
-  name            String?
-  password        String?
-  email           String?  @unique
-  emailVerified   DateTime?
-  phoneNumber     String?  @unique
-  phoneVerified   Boolean  @default(false)
-  image           String?
-  authProvider    String?
-  isAdmin         Boolean  @default(false)
+  userId          String?  // Nullable: populated if logged in, null if guest
+  pincode         String
+  cartSnapshot    Json     // Validated array of CartSnapshotItem objects
+  amount          Float
+  status          String   @default("PENDING") // PENDING, COMPLETED, EXPIRED
+  razorpayOrderId String?  @unique
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  addresses       Address[]
-  accounts        Account[]
-  carts           Cart[]
-  orders          Order[]
-  sessions        Session[]
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([email])
+  @@index([userId])
+  @@index([razorpayOrderId])
 }
 
 model Account {
@@ -61,11 +79,11 @@ model Session {
 }
 
 model VerificationToken {
-  id         String   @id @default(cuid())
-  email      String
-  token      String   @unique
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model Address {
@@ -115,21 +133,20 @@ model Product {
   orderItems OrderItem[]
 
   shopifyMapping ShopifyProductMapping?
-  
 
   @@index([fabricId])
 }
 
 model ProductVariant {
-  id        String      @id @default(cuid())
+  id        String   @id @default(cuid())
   productId String
   size      String
-  price     Int?        @default(0)
-  stock     Int         @default(0)
-  createdAt DateTime    @default(now())
+  price     Int?     @default(0)
+  stock     Int      @default(0)
+  createdAt DateTime @default(now())
 
-  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItems CartItem[]
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
   orderItems OrderItem[]
 
   shopifyMapping ShopifyVariantMapping?
@@ -155,7 +172,7 @@ model Cart {
   user  User       @relation(fields: [userId], references: [id])
   items CartItem[]
 
-  @@unique([userId]) // one cart per user
+  @@unique([userId])
 }
 
 model CartItem {
@@ -165,10 +182,10 @@ model CartItem {
   quantity  Int      @default(1)
   createdAt DateTime @default(now())
 
-  cart    Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  variant ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  @@unique([cartId, variantId]) 
+  @@unique([cartId, variantId])
 }
 
 model Order {
@@ -182,7 +199,7 @@ model Order {
   status         Status          @default(PENDING)
   paymentMethod  PaymentMethod
   isPaid         Boolean         @default(false)
-  shipments Shipment[]
+  shipments      Shipment[]
 
   shipmentStatus ShipmentStatus  @default(NOT_CREATED)
   awb            String?
@@ -203,8 +220,7 @@ model OrderItem {
   priceAtPurchase Float
   createdAt       DateTime @default(now())
   productId       String
-  shipments Shipment[]
-
+  shipments       Shipment[]
 
   order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [variantId], references: [id])
@@ -212,10 +228,10 @@ model OrderItem {
 }
 
 model ShipmentBatch {
-  id        String    @id @default(cuid())
-  createdAt DateTime  @default(now())
+  id        String      @id @default(cuid())
+  createdAt DateTime    @default(now())
   runAt     DateTime?
-  createdBy String?   // admin id or system
+  createdBy String?
   status    BatchStatus @default(PENDING)
   shipments Shipment[]
 
@@ -233,9 +249,9 @@ model Shipment {
   id              String         @id @default(cuid())
   orderId         String
   orderItemId     String
-  sequenceIndex   Int            // 0..(quantity-1) - unique per orderItem
+  sequenceIndex   Int
   batchId         String?
-  awb             String? 
+  awb             String?
   labelUrl        String?
   shippingService String?
   weightKg        Float?
@@ -248,28 +264,28 @@ model Shipment {
   updatedAt       DateTime       @updatedAt
   events          ShipmentEvent[]
 
-  order   Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  batch   ShipmentBatch? @relation(fields: [batchId], references: [id])
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  batch     ShipmentBatch? @relation(fields: [batchId], references: [id])
 
   @@unique([orderItemId, sequenceIndex])
   @@index([awb])
 }
 
 model ShipmentEvent {
-  id          String    @id @default(cuid())
-  shipmentId  String
-  code        String?
-  message     String?
-  rawPayload  Json?
-  createdAt   DateTime  @default(now())
+  id         String   @id @default(cuid())
+  shipmentId String
+  code       String?
+  message    String?
+  rawPayload Json?
+  createdAt  DateTime @default(now())
 
   shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 }
 
 model ShopifyProductMapping {
-  id               String   @id @default(uuid())
-  productId        String   @unique
+  id               String  @id @default(uuid())
+  productId        String  @unique
   shopifyProductId String
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -281,10 +297,10 @@ model ShopifyProductMapping {
 }
 
 model ShopifyVariantMapping {
-  id                String   @id @default(uuid())
-  variantId         String   @unique
-  shopifyVariantId  String
-  inventoryItemId   String
+  id               String @id @default(uuid())
+  variantId        String @unique
+  shopifyVariantId String
+  inventoryItemId  String
 
   variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
@@ -296,9 +312,9 @@ model ShopifyVariantMapping {
 }
 
 model ShopifyOrderMapping {
-  id              String   @id @default(uuid())
-  orderId         String   @unique
-  shopifyOrderId  String
+  id             String @id @default(uuid())
+  orderId        String @unique
+  shopifyOrderId String
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -307,7 +323,6 @@ model ShopifyOrderMapping {
 
   @@index([shopifyOrderId])
 }
-
 
 enum PaymentMethod {
   COD

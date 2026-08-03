@@ -158,47 +158,32 @@ export default function ProductDetailsPage({ product }: InferGetServerSidePropsT
   };
 
   
-  const handleAddToCart = async () => {
-
-  
+  const handleAddToCart = () => {
   if (!selectedSize) {
     toast.error("Please choose a size");
     return;
   }
 
-  try {
+  const variant = product?.variants.find((v) => v.size === selectedSize);
+  if(!product) return;
+  if (!variant) return;
 
-    
-    const isAuth =
-  status === "authenticated";
-    const variant = product?.variants.find(
-      (v) => v.size === selectedSize
-    );
+  addToCart({
+    variantId: variant.id,
+    productId: product.id,
+    name: product.name,
+    size: variant.size,
+    price: variant.price && variant.price > 0 ? variant.price : product.basePrice,
+    quantity: 1,
+    stock: variant.stock,
+    image: product.images?.[0]?.url,
+    fabric: product.fabric?.name,
+    color: product.color,
+    variants: product.variants,
+  });
 
-    if (!variant) {
-      throw new Error("Variant not found");
-    }
-
-    await addToCart(
-      variant.id,
-      1,
-      isAuth
-    );
-
-    setAdded(true);
-
-  } catch (error: any) {
-
-    console.error(
-      "Add to cart error:",
-      error
-    );
-
-    toast.error(
-      error.message ||
-      "Could not add item to cart."
-    );
-  }
+  setAdded(true);
+  toast.success("Added to bag!");
 };
 
 

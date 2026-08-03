@@ -22,48 +22,6 @@ function ClientHydrationWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function AuthGate() {
-  const { data: session, status } = useSession();
-  const fetchCart = useCartStore((state) => state.fetchCart);
-  const syncGuestToDB = useCartStore((state) => state.syncGuestToDB);
-
-  const router = useRouter();
-  const lastStatusRef = useRef<string | null>(null);
-
-  // redirect intent handler
-  useEffect(() => {
-    if (status === "authenticated") {
-      const intent = localStorage.getItem("redirectIntent");
-      if (intent) {
-        router.replace(intent);
-        localStorage.removeItem("redirectIntent");
-      }
-    }
-  }, [status]);
-
-  // cart handling
-  useEffect(() => {
-    if (status === lastStatusRef.current) return;
-    lastStatusRef.current = status;
-
-    if (status === "unauthenticated") {
-      fetchCart(false);
-      return;
-    }
-
-    if (status === "authenticated" && session?.user?.id) {
-      const timer = setTimeout(async () => {
-        await syncGuestToDB();
-        await fetchCart(true);
-      }, 250);
-
-      return () => clearTimeout(timer);
-    }
-  }, [status, session, fetchCart, syncGuestToDB]);
-
-  return null;
-}
-
 
 export default function App({
   Component,
@@ -85,13 +43,14 @@ export default function App({
     <SessionProvider session={session}>
       <ClientHydrationWrapper>
         {/* Side-effects and session/cart sync */}
-        <AuthGate />
+        
 
         {/* Actual page */}
         <Component {...pageProps} />
         <Toaster position="top-center" />
         {/* Global Auth Modal */}
-        <AuthModal />
+        
+        
 
         {/* Footer */}
         <div className="mt-10">

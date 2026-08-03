@@ -1,3 +1,4 @@
+
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
 
@@ -23,9 +24,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         };
       }
-
+      
       // 2. Smart Search (Tokenized)
       // "White Shirt" -> Matches products having BOTH "White" AND "Shirt"
+      
       if (search) {
         const searchTerms = search.trim().split(/\s+/);
         
@@ -64,7 +66,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         },
       });
-
       
 
       const serializedProducts = products.map((p) => ({

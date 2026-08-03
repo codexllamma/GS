@@ -5,52 +5,72 @@ import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useAuthModal } from "@/store/useAuthModal";
 
+interface LocalCartItem {
+  variantId: string;
+  quantity: number;
+}
+
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { open: openAuthModal } = useAuthModal();
 
   const [cartItems, setCartItems] = useState<any[]>([]);
+  const [pincode, setPincode] = useState("110001");
   const [loading, setLoading] = useState(true);
-
-  const [address, setAddress] = useState({
-    line1: "",
-    line2: "",
-    city: "",
-    state: "",
-    postal: "",
-    country: "India",
-  });
-
-  const [paymentMethod, setPaymentMethod] = useState<"COD" | "RAZORPAY">("COD");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   /* ===============================
-     AUTH GATE — PAGE LEVEL
+     LOAD CART (AUTH OR GUEST)
      =============================== */
   useEffect(() => {
-    if (status === "unauthenticated") {
-      localStorage.setItem("redirectIntent", "/checkout");
-      openAuthModal();
-    }
-  }, [status, openAuthModal]);
-
-  /* ===============================
-     LOAD CART + ADDRESS (AUTH ONLY)
-     =============================== */
-  useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status === "loading") return;
 
     async function loadData() {
+      setLoading(true);
       try {
-        const cartRes = await fetch("/api/cart");
-        const cartData = await cartRes.json();
-        setCartItems(cartData.cart?.items ?? []);
+        if (status === "authenticated") {
+          // Logged-in: fetch DB cart
+          const cartRes = await fetch("/api/cart");
+          const cartData = await cartRes.json();
+          setCartItems(cartData.cart?.items ?? []);
+        } else {
+          // Guest: read local storage and hydrate item details
+          const localRaw = localStorage.getItem("guest_cart");
+          const localItems: LocalCartItem[] = localRaw ? JSON.parse(localRaw) : [];
 
-        const userRes = await fetch("/api/user");
-        const user = await userRes.json();
-        if (user?.address) setAddress(user.address);
+          if (localItems.length === 0) {
+            setCartItems([]);
+            setLoading(false);
+            return;
+          }
+
+          const variantIds = localItems.map((item) => item.variantId);
+          const hydrateRes = await fetch("/api/cart/hydrate-cart", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ variantIds }),
+          });
+
+          const hydrateData = await hydrateRes.json();
+          const variantsList = hydrateData.variants ?? [];
+
+          // Merge hydrated variant details with local quantities
+          const hydratedCart = localItems.map((local) => {
+            const variantMatch = variantsList.find(
+              (v: any) => v.id === local.variantId
+            );
+            return {
+              id: local.variantId,
+              quantity: local.quantity,
+              variant: variantMatch,
+            };
+          });
+
+          setCartItems(hydratedCart);
+        }
       } catch (e) {
-        console.error(e);
+        console.error("Cart loading error:", e);
       } finally {
         setLoading(false);
       }
@@ -59,284 +79,108 @@ export default function CheckoutPage() {
     loadData();
   }, [status]);
 
-  /* ===============================
-     RAZORPAY LOADER
-     =============================== */
   const loadRazorpay = () =>
     new Promise<void>((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve();
+        return;
+      }
       const script = document.createElement("script");
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.onload = () => resolve();
       document.body.appendChild(script);
     });
-
-  /* ===============================
-     CHECKOUT HANDLER (HARD GUARDED)
-     =============================== */
+    
   const handleCheckout = async () => {
-
-  // -------------------------
-  // AUTH CHECK
-  // -------------------------
-
-  if (!session) {
-
-    localStorage.setItem(
-      "redirectIntent",
-      "/checkout"
-    );
-
-    openAuthModal();
-
-    return;
-  }
-
-  // -------------------------
-  // ADDRESS VALIDATION
-  // -------------------------
-
-  if (
-    !address.line1 ||
-    !address.city ||
-    !address.state ||
-    !address.postal
-  ) {
-
-    alert(
-      "Please fill in all required address fields."
-    );
-
-    return;
-  }
-
-  try {
-
-    // -------------------------
-    // CREATE ORDER
-    // -------------------------
-
-    const res = await fetch(
-      "/api/checkout",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
-          address,
-          paymentMethod,
-        }),
-      }
-    );
-
-    // -------------------------
-    // SESSION EXPIRED
-    // -------------------------
-
-    if (res.status === 401) {
-
-      localStorage.setItem(
-        "redirectIntent",
-        "/checkout"
-      );
-
-      openAuthModal();
-
+    if (!pincode || pincode.trim().length === 0) {
+      alert("Please enter a valid PIN code.");
       return;
     }
 
-    // -------------------------
-    // CHECKOUT FAILURE
-    // -------------------------
-
-    const data = await res.json();
-
-    if (!res.ok) {
-
-      throw new Error(
-        data?.message ||
-        "Checkout failed"
-      );
+    if (cartItems.length === 0) {
+      alert("Your cart is empty.");
+      return;
     }
 
-    const order = data.order;
+    setIsSubmitting(true);
 
-    // =====================================================
-    // RAZORPAY FLOW
-    // =====================================================
+    try {
+      // Build payload based on auth state
+      let payload: any = { pincode };
 
-    if (
-      paymentMethod === "RAZORPAY"
-    ) {
+      if (status !== "authenticated") {
+        const localRaw = localStorage.getItem("guest_cart");
+        const localItems: LocalCartItem[] = localRaw ? JSON.parse(localRaw) : [];
+        payload.guestItems = localItems;
+      }
 
+      // 1. Create Checkout Session + Razorpay Order
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Failed to initialize checkout.");
+      }
+
+      // 2. Load SDK & Trigger Magic Checkout Modal
       await loadRazorpay();
 
-      const rzp =
-        new (window as any).Razorpay({
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: data.razorpayOrder.amount,
+        currency: data.razorpayOrder.currency,
+        name: "Your Store Name",
+        description: "Order Checkout",
+        order_id: data.razorpayOrder.id,
 
-          key:
-            process.env
-              .NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        handler: async () => {
+          // Clear guest cart from localStorage on success
+          if (status !== "authenticated") {
+            localStorage.removeItem("guest_cart");
+          }
 
-          amount:
-            data.razorpayOrder.amount,
+          // Redirect to order confirmation (Webhook handles order fulfillment)
+          router.push(`/order-confirmation?session_id=${data.checkoutSessionId}`);
+        },
 
-          currency: "INR",
+        modal: {
+          ondismiss: () => {
+            setIsSubmitting(false);
+          },
+        },
 
-          name: "Your Store",
-
-          description:
-            "Order Payment",
-
-          order_id:
-            data.razorpayOrder.id,
-
-          // -------------------------
-          // PAYMENT SUCCESS
-          // -------------------------
-
-          handler: async (
-            response: any
-          ) => {
-
-            try {
-
-              // -------------------------
-              // VERIFY PAYMENT
-              // -------------------------
-
-              const verifyRes =
-                await fetch(
-                  "/api/razorpay/verify-payment",
-                  {
-
-                    method: "POST",
-
-                    headers: {
-                      "Content-Type":
-                        "application/json",
-                    },
-
-                    body: JSON.stringify({
-
-                      orderId:
-                        order.id,
-
-                      razorpayPaymentId:
-                        response
-                          .razorpay_payment_id,
-
-                      razorpayOrderId:
-                        response
-                          .razorpay_order_id,
-
-                      razorpaySignature:
-                        response
-                          .razorpay_signature,
-                    }),
-                  }
-                );
-
-              const verifyData =
-                await verifyRes.json();
-
-              // -------------------------
-              // VERIFY FAILED
-              // -------------------------
-
-              if (!verifyRes.ok) {
-
-                alert(
-                  verifyData?.message ||
-                  "Payment verification failed"
-                );
-
-                return;
-              }
-
-              // -------------------------
-              // SUCCESS
-              // -------------------------
-
-              router.push(
-                `/order-confirmation/${order.id}`
-              );
-
-            } catch (err) {
-
-              console.error(
-                "Verification failed:",
-                err
-              );
-
-              alert(
-                "Payment verification failed"
-              );
+        prefill: session?.user
+          ? {
+              name: session.user.name || "",
+              email: session.user.email || "",
             }
-          },
+          : undefined,
 
-          // -------------------------
-          // PAYMENT FAILED / CLOSED
-          // -------------------------
+        theme: {
+          color: "#000000",
+        },
+      };
 
-          modal: {
-
-            ondismiss: () => {
-
-              console.log(
-                "Razorpay popup closed"
-              );
-            },
-          },
-
-          prefill: {
-
-            name:
-              session.user?.name || "",
-
-            email:
-              session.user?.email || "",
-          },
-
-          theme: {
-            color: "#000000",
-          },
-        });
-
+      const rzp = new (window as any).Razorpay(options);
       rzp.open();
-
-      return;
+    } catch (err: any) {
+      console.error("Checkout failed:", err);
+      alert(err?.message || "Checkout failed.");
+      setIsSubmitting(false);
     }
-
-    // =====================================================
-    // COD FLOW
-    // =====================================================
-
-    router.push(
-      `/order-confirmation/${order.id}`
-    );
-
-  } catch (err: any) {
-
-    console.error(
-      "Checkout failed:",
-      err
-    );
-
-    alert(
-      err?.message ||
-      "Checkout failed."
-    );
-  }
-};
+  };
 
   /* ===============================
      LOADING STATE
      =============================== */
-  if (loading || status === "loading") {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-neutral-500">
         Loading checkout…
@@ -362,115 +206,101 @@ export default function CheckoutPage() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <button
           onClick={() => router.push("/cart")}
-          className="flex items-center text-sm text-neutral-600 mb-6"
+          className="flex items-center text-sm text-neutral-600 mb-6 cursor-pointer hover:text-black transition"
         >
           <ArrowLeft size={16} className="mr-2" /> Back to cart
         </button>
 
-        <h1 className="text-3xl font-light mb-10">Checkout</h1>
+        <div className="flex items-center justify-between mb-10">
+          <h1 className="text-3xl font-light">Checkout</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-10">
-          {/* LEFT */}
-          <div className="space-y-8">
-            {/* Address */}
-            <section className="bg-white p-6 rounded-xl border">
-              <h2 className="text-lg font-medium mb-4">Shipping Address</h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input
-                  placeholder="Address line 1 *"
-                  value={address.line1}
-                  onChange={(e) => setAddress({ ...address, line1: e.target.value })}
-                  className="border p-3 rounded"
-                />
-                <input
-                  placeholder="Address line 2"
-                  value={address.line2}
-                  onChange={(e) => setAddress({ ...address, line2: e.target.value })}
-                  className="border p-3 rounded"
-                />
-                <input
-                  placeholder="City *"
-                  value={address.city}
-                  onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                  className="border p-3 rounded"
-                />
-                <input
-                  placeholder="State *"
-                  value={address.state}
-                  onChange={(e) => setAddress({ ...address, state: e.target.value })}
-                  className="border p-3 rounded"
-                />
-                <input
-                  placeholder="Postal *"
-                  value={address.postal}
-                  onChange={(e) => setAddress({ ...address, postal: e.target.value })}
-                  className="border p-3 rounded"
-                />
-              </div>
-            </section>
-
-            {/* Payment */}
-            <section className="bg-white p-6 rounded-xl border">
-              <h2 className="text-lg font-medium mb-4">Payment Method</h2>
-
-              <label className="flex gap-2 items-center mb-3">
-                <input
-                  type="radio"
-                  checked={paymentMethod === "COD"}
-                  onChange={() => setPaymentMethod("COD")}
-                />
-                Cash on Delivery
-              </label>
-
-              <label className="flex gap-2 items-center">
-                <input
-                  type="radio"
-                  checked={paymentMethod === "RAZORPAY"}
-                  onChange={() => setPaymentMethod("RAZORPAY")}
-                />
-                Pay Online (Razorpay)
-              </label>
-
-              <motion.button
-                whileTap={{ scale: 0.98 }}
-                onClick={handleCheckout}
-                className="mt-6 w-full bg-black text-white py-3 rounded"
-              >
-                Confirm & Pay
-              </motion.button>
-            </section>
-          </div>
-
-          {/* RIGHT */}
-          <aside className="bg-white p-6 rounded-xl border h-fit">
-            <h2 className="text-lg font-medium mb-4">Order Summary</h2>
-
-            {cartItems.map((item) => (
-              <div key={item.id} className="flex justify-between mb-3 text-sm">
-                <span>
-                  {item.variant?.product?.name} × {item.quantity}
-                </span>
-                <span>
-                  ₹
-                  {(
-                    item.quantity *
-                    (item.variant?.price ??
-                      item.variant?.product?.basePrice ??
-                      0)
-                  ).toLocaleString()}
-                </span>
-              </div>
-            ))}
-
-            <hr className="my-4" />
-
-            <div className="flex justify-between font-medium">
-              <span>Total</span>
-              <span>₹{total.toLocaleString()}</span>
-            </div>
-          </aside>
+          {status !== "authenticated" && (
+            <button
+              onClick={() => openAuthModal()}
+              className="text-sm text-neutral-600 underline hover:text-black"
+            >
+              Have an account? Sign in
+            </button>
+          )}
         </div>
+
+        {cartItems.length === 0 ? (
+          <div className="bg-white p-12 text-center rounded-xl border">
+            <p className="text-neutral-500 mb-4">Your cart is empty.</p>
+            <button
+              onClick={() => router.push("/")}
+              className="bg-black text-white px-6 py-2 rounded text-sm"
+            >
+              Continue Shopping
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-10">
+            {/* LEFT */}
+            <div className="space-y-8">
+              <section className="bg-white p-6 rounded-xl border">
+                <h2 className="text-lg font-medium mb-2">Delivery PIN Code</h2>
+                <p className="text-xs text-neutral-500 mb-4">
+                  Enter your PIN code to verify serviceability. Address details will be collected during payment.
+                </p>
+
+                <input
+                  type="text"
+                  placeholder="Enter 6-digit PIN code *"
+                  value={pincode}
+                  onChange={(e) => setPincode(e.target.value)}
+                  className="border p-3 rounded w-full max-w-xs"
+                  maxLength={6}
+                />
+              </section>
+
+              <section className="bg-white p-6 rounded-xl border">
+                <h2 className="text-lg font-medium mb-2">Express Checkout</h2>
+                <p className="text-sm text-neutral-500 mb-6">
+                  Address collection and payment choices (UPI, Cards, COD) are managed securely by Razorpay Magic Checkout.
+                </p>
+
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  disabled={isSubmitting}
+                  onClick={handleCheckout}
+                  className="w-full bg-black text-white py-3.5 rounded font-medium disabled:opacity-50 cursor-pointer"
+                >
+                  {isSubmitting ? "Processing..." : "Proceed to Magic Checkout"}
+                </motion.button>
+              </section>
+            </div>
+
+            {/* RIGHT */}
+            <aside className="bg-white p-6 rounded-xl border h-fit">
+              <h2 className="text-lg font-medium mb-4">Order Summary</h2>
+
+              {cartItems.map((item, idx) => (
+                <div key={item.id || idx} className="flex justify-between mb-3 text-sm">
+                  <span>
+                    {item.variant?.product?.name || "Product"} ({item.variant?.size}) × {item.quantity}
+                  </span>
+                  <span>
+                    ₹
+                    {(
+                      item.quantity *
+                      (item.variant?.price ??
+                        item.variant?.product?.basePrice ??
+                        0)
+                    ).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+
+              <hr className="my-4" />
+
+              <div className="flex justify-between font-medium text-base">
+                <span>Total</span>
+                <span>₹{total.toLocaleString()}</span>
+              </div>
+            </aside>
+          </div>
+        )}
       </div>
     </div>
   );

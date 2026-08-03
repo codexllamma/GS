@@ -5,8 +5,6 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 
-// --- CONFIGURATION: CATEGORY IMAGES ---
-// Replace these placeholders with your actual image URLs later.
 const CATEGORIES = [
   { 
     id: "cat_shirts",
@@ -28,7 +26,7 @@ const CATEGORIES = [
   }
 ];
 
-// --- INTERFACES ---
+
 export interface Product {
   id: string;
   name: string;
