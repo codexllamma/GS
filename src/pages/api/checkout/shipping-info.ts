@@ -55,9 +55,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       state_code: addr.state_code || "MH",
       country: "IN",
       shipping_methods:
-        shippingMethods.length > 0
-          ? shippingMethods
-          : [
+      
+          [
               {
                 id: "standard",
                 name: "Standard Delivery",
