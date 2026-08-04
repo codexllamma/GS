@@ -234,24 +234,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    // 5. Background Shopify Auto-Sync (Non-blocking)
-    (async () => {
-      try {
-        console.log(`[SHOPIFY AUTO-SYNC] Syncing Order ${createdOrder.id}`);
+    // 5. Shopify Auto-Sync (Awaited with try/catch so serverless containers do not freeze execution)
+    try {
+      console.log(`[SHOPIFY AUTO-SYNC] Syncing Order ${createdOrder.id}`);
 
-        // Sync order & customer profile to Shopify
-        await syncOrder(createdOrder.id);
+      // Sync order & customer profile to Shopify
+      await syncOrder(createdOrder.id);
 
-        // Sync stock levels for each purchased variant
-        for (const variantId of purchasedVariantIds) {
-          await syncVariantInventory(variantId);
-        }
-
-        console.log(`[SHOPIFY AUTO-SYNC SUCCESS] Completed for Order ${createdOrder.id}`);
-      } catch (syncErr) {
-        console.error(`[SHOPIFY AUTO-SYNC ERROR] Order ${createdOrder.id} sync failed:`, syncErr);
+      // Sync stock levels for each purchased variant
+      for (const variantId of purchasedVariantIds) {
+        await syncVariantInventory(variantId);
       }
-    })();
+
+      console.log(`[SHOPIFY AUTO-SYNC SUCCESS] Completed for Order ${createdOrder.id}`);
+    } catch (syncErr) {
+      console.error(`[SHOPIFY AUTO-SYNC ERROR] Order ${createdOrder.id} sync failed:`, syncErr);
+    }
 
     console.log("================ [VERIFY-PAYMENT END SUCCESS] ================");
 
