@@ -4,7 +4,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 
-
 interface CartSnapshotItem {
   variantId: string;
   productId: string;
@@ -15,41 +14,87 @@ interface CartSnapshotItem {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log("================ [VERIFY-PAYMENT START] ================");
+  console.log("[DEBUG] HTTP Method:", req.method);
+  console.log("[DEBUG] Raw Request Body:", JSON.stringify(req.body, null, 2));
+
   if (req.method !== "POST") {
+    console.log("[DEBUG ERROR] Method not allowed:", req.method);
     return res.status(405).json({ success: false, message: "Method Not Allowed" });
   }
 
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, checkoutSessionId } = req.body;
+  // Support parameter name variations
+  const razorpay_order_id = req.body.razorpay_order_id;
+  const razorpay_payment_id = req.body.razorpay_payment_id;
+  const razorpay_signature = req.body.razorpay_signature;
+  const checkoutSessionId =
+    req.body.checkoutSessionId || req.body.sessionId || req.body.checkout_session_id;
 
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !checkoutSessionId) {
-    return res.status(400).json({ success: false, message: "Missing required verification parameters." });
+  console.log("[DEBUG] Extracted Verification Parameters:");
+  console.log("  - razorpay_order_id:", razorpay_order_id ?? "MISSING");
+  console.log("  - razorpay_payment_id:", razorpay_payment_id ?? "MISSING");
+  console.log("  - razorpay_signature:", razorpay_signature ? "[PRESENT]" : "MISSING");
+  console.log("  - checkoutSessionId:", checkoutSessionId ?? "MISSING");
+
+  const missingParams = [];
+  if (!razorpay_order_id) missingParams.push("razorpay_order_id");
+  if (!razorpay_payment_id) missingParams.push("razorpay_payment_id");
+  if (!razorpay_signature) missingParams.push("razorpay_signature");
+  if (!checkoutSessionId) missingParams.push("checkoutSessionId");
+
+  if (missingParams.length > 0) {
+    console.error("[DEBUG ERROR] Failed parameter validation. Missing keys:", missingParams);
+    return res.status(400).json({
+      success: false,
+      message: `Missing required verification parameters: ${missingParams.join(", ")}`,
+      receivedBody: req.body,
+    });
   }
 
   // 1. Verify Razorpay HMAC SHA256 Signature
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET!;
+  if (!secret) {
+    console.error("[DEBUG ERROR] Neither RAZORPAY_WEBHOOK_SECRET nor RAZORPAY_KEY_SECRET is set in environment!");
+  }
+
   const generatedSignature = crypto
     .createHmac("sha256", secret)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
 
+  console.log("[DEBUG] Signature Check:");
+  console.log("  - Expected Signature:", generatedSignature);
+  console.log("  - Received Signature:", razorpay_signature);
+  console.log("  - Signatures Match?:", generatedSignature === razorpay_signature);
+
   if (generatedSignature !== razorpay_signature) {
+    console.error("[DEBUG ERROR] HMAC Signature Mismatch!");
     return res.status(400).json({ success: false, message: "Invalid payment signature." });
   }
 
   try {
     // 2. Fetch target CheckoutSession
+    console.log(`[DEBUG] Fetching CheckoutSession from DB for ID: "${checkoutSessionId}"...`);
     const session = await prisma.checkoutSession.findUnique({
       where: { id: checkoutSessionId },
     });
 
     if (!session) {
-      return res.status(404).json({ success: false, message: "Checkout session not found." });
+      console.error(`[DEBUG ERROR] No CheckoutSession found in database for ID: "${checkoutSessionId}"`);
+      return res.status(404).json({ success: false, message: `Checkout session not found for ID: ${checkoutSessionId}` });
     }
 
-    const cartSnapshot = (session.cartSnapshot as unknown as CartSnapshotItem[]) || [];
+    console.log("[DEBUG] CheckoutSession Found:");
+    console.log("  - Status:", session.status);
+    console.log("  - Amount:", session.amount);
+    console.log("  - User ID:", session.userId ?? "Guest");
 
-    // Idempotency check: if session is already completed, return existing order
+    const cartSnapshot = (session.cartSnapshot as unknown as CartSnapshotItem[]) || [];
+    console.log(`[DEBUG] Cart Snapshot contains ${cartSnapshot.length} items.`);
+
+    // Idempotency check
     if (session.status === "COMPLETED") {
+      console.log("[DEBUG] Session already COMPLETED. Returning existing order...");
       const existingOrder = await prisma.order.findUnique({
         where: { checkoutSessionId: session.id },
       });
@@ -61,7 +106,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // 3. Fetch detailed payment/customer info from Razorpay REST API
+    // 3. Fetch payment info from Razorpay API
+    console.log(`[DEBUG] Fetching Payment details from Razorpay API for ID: "${razorpay_payment_id}"...`);
     const razorpayAuth = Buffer.from(
       `${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`
     ).toString("base64");
@@ -70,22 +116,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers: { Authorization: `Basic ${razorpayAuth}` },
     });
 
+    console.log("[DEBUG] Razorpay API Response Status:", rzpRes.status);
     const paymentData = rzpRes.ok ? await rzpRes.json() : {};
+    if (!rzpRes.ok) {
+      console.warn("[DEBUG WARNING] Could not fetch payment details from Razorpay REST API:", paymentData);
+    }
+
     const customerEmail = paymentData.email || null;
     const customerPhone = paymentData.contact || null;
+    console.log("  - Customer Email:", customerEmail ?? "N/A");
+    console.log("  - Customer Phone:", customerPhone ?? "N/A");
 
-    // Extract address details passed by Magic Checkout
     const rawAddress = paymentData.notes?.shipping_address
       ? JSON.parse(paymentData.notes.shipping_address)
       : paymentData.customer_details?.shipping_address || {};
 
-    const fullName = rawAddress.name || rawAddress.first_name 
-      ? `${rawAddress.first_name || ""} ${rawAddress.last_name || ""}`.trim() 
-      : "HIÈR Customer";
+    const fullName =
+      rawAddress.name ||
+      `${rawAddress.first_name || ""} ${rawAddress.last_name || ""}`.trim() ||
+      "HIÈR Customer";
 
     // 4. Prisma Atomic Database Transaction
+    console.log("[DEBUG] Starting Prisma Transaction...");
     const { createdOrder, purchasedVariantIds } = await prisma.$transaction(async (tx) => {
-      // Step A: Upsert User (by Email or Phone)
+      // Step A: Upsert User
       let user = null;
       const searchCriteria = customerEmail
         ? { email: customerEmail }
@@ -94,18 +148,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         : null;
 
       if (searchCriteria) {
+        console.log("[DEBUG Transaction] Upserting User with criteria:", searchCriteria);
         user = await tx.user.upsert({
           where: searchCriteria,
-          update: {}, // Do nothing if user already exists
+          update: {},
           create: {
             email: customerEmail || undefined,
             phoneNumber: customerPhone || undefined,
             name: fullName,
           },
         });
+        console.log("[DEBUG Transaction] User resolved ID:", user.id);
       }
 
       // Step B: Create Address Record
+      console.log("[DEBUG Transaction] Creating Address record...");
       const address = await tx.address.create({
         data: {
           userId: user ? user.id : session.userId || "",
@@ -117,8 +174,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           country: rawAddress.country || "India",
         },
       });
+      console.log("[DEBUG Transaction] Address created ID:", address.id);
 
       // Step C: Create Order
+      console.log("[DEBUG Transaction] Creating Order record...");
       const newOrder = await tx.order.create({
         data: {
           userId: user?.id || session.userId,
@@ -142,8 +201,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         },
       });
+      console.log("[DEBUG Transaction] Order created ID:", newOrder.id);
 
-      // Step D: Decrement ProductVariant Stock Levels
+      // Step D: Decrement Stock
+      console.log("[DEBUG Transaction] Decrementing stock for variants...");
       for (const item of cartSnapshot) {
         await tx.productVariant.update({
           where: { id: item.variantId },
@@ -153,7 +214,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      // Step E: Mark CheckoutSession as COMPLETED
+      // Step E: Complete Session
+      console.log("[DEBUG Transaction] Marking CheckoutSession as COMPLETED...");
       await tx.checkoutSession.update({
         where: { id: session.id },
         data: { status: "COMPLETED" },
@@ -164,62 +226,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         purchasedVariantIds: cartSnapshot.map((item) => item.variantId),
       };
     });
-    /*
-    // 5. Asynchronous Background Sync to Shopify (Non-blocking)
-    (async () => {
-      try {
-        const shopifyCustomerId = await getOrCreateShopifyCustomer({
-          email: customerEmail,
-          phone: customerPhone,
-          firstName: rawAddress.first_name || fullName.split(" ")[0],
-          lastName: rawAddress.last_name || fullName.split(" ").slice(1).join(" "),
-          address: {
-            address1: rawAddress.line1 || rawAddress.address1,
-            address2: rawAddress.line2 || rawAddress.address2,
-            city: rawAddress.city,
-            province: rawAddress.state || rawAddress.province,
-            zip: rawAddress.zipcode || rawAddress.pincode || session.pincode,
-            country: "India",
-          },
-        });
 
-        const shopifyOrder = await createShopifyOrder({
-          localOrderId: createdOrder.id,
-          shopifyCustomerId,
-          email: customerEmail,
-          phone: customerPhone,
-          shippingAddress: rawAddress,
-          items: cartSnapshot.map((item) => ({
-            title: item.title || "HIÈR Product",
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          totalPrice: session.amount,
-        });
+    console.log("[DEBUG] Transaction successful! Order ID:", createdOrder.id);
+    console.log("================ [VERIFY-PAYMENT END SUCCESS] ================");
 
-        if (shopifyOrder?.id) {
-          await prisma.shopifyOrderMapping.create({
-            data: {
-              orderId: createdOrder.id,
-              shopifyOrderId: String(shopifyOrder.id),
-            },
-          });
-        }
-      } catch (shopifyErr) {
-        console.error(`[Shopify Async Sync Failed] Order ${createdOrder.id}:`, shopifyErr);
-      }
-    })();
-
-    // 6. Return response with purchasedVariantIds for frontend store cleanup
     return res.status(200).json({
       success: true,
       message: "Payment verified, order created, and stock updated.",
       orderId: createdOrder.id,
       purchasedVariantIds,
     });
-    */
   } catch (error: any) {
-    console.error("[Payment Verification Error]:", error);
-    return res.status(500).json({ success: false, message: error.message || "Internal server error." });
+    console.error("================ [VERIFY-PAYMENT EXCEPTION] ================");
+    console.error("[DEBUG ERROR] Exception Message:", error?.message);
+    console.error("[DEBUG ERROR] Full Error Stack:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message || "Internal server error.",
+      errorDetails: String(error),
+    });
   }
 }
