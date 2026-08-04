@@ -36,15 +36,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const couriers = srData?.data?.available_courier_companies || [];
 
     // 3. Map Shiprocket couriers into Razorpay Magic Checkout format
-    const shippingMethods = couriers.map((c: any) => ({
-      id: String(c.courier_company_id),
-      name: c.courier_name,
-      description: `Estimated Delivery: ${c.estimated_delivery_days || 2} days`,
-      serviceable: true,
-      shipping_fee: Math.round(Number(c.rate) * 100), // in paise
-      cod: c.cod === 1,
-      cod_fee: Math.round(Number(c.cod_charges || 0) * 100),
-    }));
+    const shippingMethods = couriers.map((courier: any) => ({
+  id: String(courier.courier_company_id),
+  name: String(courier.courier_name),
+  description: `Delivered by ${courier.etd || "2-3 days"}`,
+  serviceable: true,
+  shipping_fee: Math.round(Number(courier.rate || 0) * 100), // ₹105.36 -> 10536 paise
+  cod: courier.cod === 1,
+  cod_fee: Math.round(Number(courier.cod_charges || 0) * 100), // ₹52.00 -> 5200 paise
+}));
 
     const mappedAddresses = (addresses || []).map((addr: any) => ({
       id: addr.id ?? "0",
