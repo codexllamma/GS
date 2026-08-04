@@ -18,7 +18,7 @@ declare global {
 export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
   const [loading, setLoading] = useState(false);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
-  const clearCart = useCartStore((state) => state.clearCart);
+  const clearPurchasedItems = useCartStore((state) => state.clearPurchasedItems);
   const { data: session } = useSession();
 
   // Helper to dynamically load the Razorpay SDK script
@@ -80,7 +80,7 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
         throw new Error(data.message || "Failed to create checkout session");
       }
 
-      // 3. Dynamically construct prefill object (Omitting empty contact field)
+      // 3. Dynamically construct prefill object
       const prefill: Record<string, string> = {};
       if (session?.user?.name) prefill.name = session.user.name;
       if (session?.user?.email) prefill.email = session.user.email;
@@ -94,11 +94,46 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
         show_coupons: true,
         description: "Order Checkout",
         prefill,
-        handler: function (response: any) {
-          console.log("Payment successful:", response);
-          toast.success("Payment Successful! Processing order...");
-          clearCart();
-          window.location.href = `/order/success?order_id=${response.razorpay_order_id}&payment_id=${response.razorpay_payment_id}`;
+        handler: async function (response: any) {
+          const toastId = toast.loading("Verifying payment security...");
+
+          try {
+            // 1. Call verification endpoint
+            const verifyRes = await fetch("/api/razorpay/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                checkoutSessionId: data.checkoutSessionId,
+              }),
+            });
+
+            const verifyData = await verifyRes.json();
+
+            if (!verifyRes.ok || !verifyData.success) {
+              toast.error(verifyData.message || "Payment verification failed.", {
+                id: toastId,
+              });
+              return;
+            }
+
+            // 2. Intelligent Selective Cart Cleanup
+            if (Array.isArray(verifyData.purchasedVariantIds)) {
+              clearPurchasedItems(verifyData.purchasedVariantIds);
+            }
+
+            toast.success("Payment verified successfully!", { id: toastId });
+
+            // 3. Redirect to dynamic order confirmation route
+            window.location.href = `/order-confirmation/${verifyData.orderId}`;
+          } catch (err: any) {
+            console.error("Verification error:", err);
+            toast.error("Network error during payment verification.", {
+              id: toastId,
+            });
+          }
         },
         modal: {
           ondismiss: function () {

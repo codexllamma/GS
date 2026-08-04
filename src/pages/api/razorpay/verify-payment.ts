@@ -1,221 +1,225 @@
-import { NextApiRequest, NextApiResponse } from "next";
+// pages/api/razorpay/verify-payment.ts
+
+import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
 
+interface CartSnapshotItem {
+  variantId: string;
+  productId: string;
+  quantity: number;
+  price: number;
+  title?: string;
+  size?: string;
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
-
-    res.setHeader("Allow", ["POST"]);
-
-    return res
-      .status(405)
-      .end(`Method ${req.method} Not Allowed`);
+    return res.status(405).json({ success: false, message: "Method Not Allowed" });
   }
 
-  const {
-    orderId,
-    razorpayPaymentId,
-    razorpayOrderId,
-    razorpaySignature,
-  } = req.body;
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, checkoutSessionId } = req.body;
 
-  // -------------------------
-  // BASIC VALIDATION
-  // -------------------------
-
-  if (
-    !orderId ||
-    !razorpayPaymentId ||
-    !razorpayOrderId ||
-    !razorpaySignature
-  ) {
-
-    return res.status(400).json({
-      message: "Missing required fields",
-    });
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !checkoutSessionId) {
+    return res.status(400).json({ success: false, message: "Missing required verification parameters." });
   }
 
-  // -------------------------
-  // SIGNATURE VERIFICATION
-  // -------------------------
-
+  // 1. Verify Razorpay HMAC SHA256 Signature
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET!;
   const generatedSignature = crypto
-    .createHmac(
-      "sha256",
-      process.env.RAZORPAY_KEY_SECRET!
-    )
-    .update(
-      `${razorpayOrderId}|${razorpayPaymentId}`
-    )
+    .createHmac("sha256", secret)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest("hex");
 
-  if (
-    generatedSignature !==
-    razorpaySignature
-  ) {
-
-    return res.status(400).json({
-      message: "Invalid signature",
-    });
+  if (generatedSignature !== razorpay_signature) {
+    return res.status(400).json({ success: false, message: "Invalid payment signature." });
   }
 
   try {
+    // 2. Fetch target CheckoutSession
+    const session = await prisma.checkoutSession.findUnique({
+      where: { id: checkoutSessionId },
+    });
 
-    // -------------------------
-    // TRANSACTION
-    // -------------------------
+    if (!session) {
+      return res.status(404).json({ success: false, message: "Checkout session not found." });
+    }
 
-    await prisma.$transaction(
-      async (tx) => {
+    const cartSnapshot = (session.cartSnapshot as unknown as CartSnapshotItem[]) || [];
 
-        // -------------------------
-        // LOAD ORDER
-        // -------------------------
+    // Idempotency check: if session is already completed, return existing order
+    if (session.status === "COMPLETED") {
+      const existingOrder = await prisma.order.findUnique({
+        where: { checkoutSessionId: session.id },
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Order already processed.",
+        orderId: existingOrder?.id,
+        purchasedVariantIds: cartSnapshot.map((item) => item.variantId),
+      });
+    }
 
-        const order =
-          await tx.order.findUnique({
-            where: {
-              id: orderId,
-            },
+    // 3. Fetch detailed payment/customer info from Razorpay REST API
+    const razorpayAuth = Buffer.from(
+      `${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`
+    ).toString("base64");
 
-            include: {
-              orderItems: {
-                include: {
-                  variant: {
-                    include: {
-                      product: true,
-                    },
-                  },
-                },
-              },
-            },
-          });
+    const rzpRes = await fetch(`https://api.razorpay.com/v1/payments/${razorpay_payment_id}`, {
+      headers: { Authorization: `Basic ${razorpayAuth}` },
+    });
 
-        if (!order) {
+    const paymentData = rzpRes.ok ? await rzpRes.json() : {};
+    const customerEmail = paymentData.email || null;
+    const customerPhone = paymentData.contact || null;
 
-          throw new Error(
-            "Order not found"
-          );
-        }
+    // Extract address details passed by Magic Checkout
+    const rawAddress = paymentData.notes?.shipping_address
+      ? JSON.parse(paymentData.notes.shipping_address)
+      : paymentData.customer_details?.shipping_address || {};
 
-        // -------------------------
-        // IDEMPOTENCY CHECK
-        // -------------------------
+    const fullName = rawAddress.name || rawAddress.first_name 
+      ? `${rawAddress.first_name || ""} ${rawAddress.last_name || ""}`.trim() 
+      : "HIÈR Customer";
 
-        if (order.isPaid) {
+    // 4. Prisma Atomic Database Transaction
+    const { createdOrder, purchasedVariantIds } = await prisma.$transaction(async (tx) => {
+      // Step A: Upsert User (by Email or Phone)
+      let user = null;
+      const searchCriteria = customerEmail
+        ? { email: customerEmail }
+        : customerPhone
+        ? { phoneNumber: customerPhone }
+        : null;
 
-          return;
-        }
-
-        // -------------------------
-        // STOCK VALIDATION
-        // -------------------------
-
-        for (const item of order.orderItems) {
-
-          if (
-            item.variant.stock <
-            item.quantity
-          ) {
-
-            throw new Error(
-              `Insufficient stock for ${item.variant.product.name} - ${item.variant.size}`
-            );
-          }
-        }
-
-        // -------------------------
-        // STOCK DECREMENT
-        // -------------------------
-
-        for (const item of order.orderItems) {
-
-          const result =
-            await tx.productVariant.updateMany({
-              where: {
-                id: item.variantId,
-
-                stock: {
-                  gte: item.quantity,
-                },
-              },
-
-              data: {
-                stock: {
-                  decrement:
-                    item.quantity,
-                },
-              },
-            });
-
-          if (result.count === 0) {
-
-            throw new Error(
-              `Failed stock decrement for ${item.variant.product.name} - ${item.variant.size}`
-            );
-          }
-        }
-
-        // -------------------------
-        // MARK ORDER PAID
-        // -------------------------
-
-        await tx.order.update({
-          where: {
-            id: orderId,
+      if (searchCriteria) {
+        user = await tx.user.upsert({
+          where: searchCriteria,
+          update: {}, // Do nothing if user already exists
+          create: {
+            email: customerEmail || undefined,
+            phoneNumber: customerPhone || undefined,
+            name: fullName,
           },
+        });
+      }
 
+      // Step B: Create Address Record
+      const address = await tx.address.create({
+        data: {
+          userId: user ? user.id : session.userId || "",
+          line1: rawAddress.line1 || rawAddress.address1 || "N/A",
+          line2: rawAddress.line2 || rawAddress.address2 || "",
+          city: rawAddress.city || "N/A",
+          state: rawAddress.state || rawAddress.province || "N/A",
+          postal: rawAddress.zipcode || rawAddress.pincode || session.pincode,
+          country: rawAddress.country || "India",
+        },
+      });
+
+      // Step C: Create Order
+      const newOrder = await tx.order.create({
+        data: {
+          userId: user?.id || session.userId,
+          addressId: address.id,
+          checkoutSessionId: session.id,
+          razorpayOrderId: razorpay_order_id,
+          razorpayPaymentId: razorpay_payment_id,
+          subtotal: session.amount,
+          deliveryCharge: 0.0,
+          total: session.amount,
+          status: "PROCESSING",
+          paymentMethod: "RAZORPAY",
+          isPaid: true,
+          orderItems: {
+            create: cartSnapshot.map((item) => ({
+              variantId: item.variantId,
+              productId: item.productId,
+              quantity: item.quantity,
+              priceAtPurchase: item.price,
+            })),
+          },
+        },
+      });
+
+      // Step D: Decrement ProductVariant Stock Levels
+      for (const item of cartSnapshot) {
+        await tx.productVariant.update({
+          where: { id: item.variantId },
           data: {
+            stock: { decrement: item.quantity },
+          },
+        });
+      }
 
-            isPaid: true,
+      // Step E: Mark CheckoutSession as COMPLETED
+      await tx.checkoutSession.update({
+        where: { id: session.id },
+        data: { status: "COMPLETED" },
+      });
 
-            status: "PROCESSING",
-
+      return {
+        createdOrder: newOrder,
+        purchasedVariantIds: cartSnapshot.map((item) => item.variantId),
+      };
+    });
+    /*
+    // 5. Asynchronous Background Sync to Shopify (Non-blocking)
+    (async () => {
+      try {
+        const shopifyCustomerId = await getOrCreateShopifyCustomer({
+          email: customerEmail,
+          phone: customerPhone,
+          firstName: rawAddress.first_name || fullName.split(" ")[0],
+          lastName: rawAddress.last_name || fullName.split(" ").slice(1).join(" "),
+          address: {
+            address1: rawAddress.line1 || rawAddress.address1,
+            address2: rawAddress.line2 || rawAddress.address2,
+            city: rawAddress.city,
+            province: rawAddress.state || rawAddress.province,
+            zip: rawAddress.zipcode || rawAddress.pincode || session.pincode,
+            country: "India",
           },
         });
 
-        // -------------------------
-        // CLEAR USER CART
-        // -------------------------
+        const shopifyOrder = await createShopifyOrder({
+          localOrderId: createdOrder.id,
+          shopifyCustomerId,
+          email: customerEmail,
+          phone: customerPhone,
+          shippingAddress: rawAddress,
+          items: cartSnapshot.map((item) => ({
+            title: item.title || "HIÈR Product",
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          totalPrice: session.amount,
+        });
 
-        const cart =
-          await tx.cart.findFirst({
-            where: {
-              userId: order.userId,
-            },
-          });
-
-        if (cart) {
-
-          await tx.cartItem.deleteMany({
-            where: {
-              cartId: cart.id,
+        if (shopifyOrder?.id) {
+          await prisma.shopifyOrderMapping.create({
+            data: {
+              orderId: createdOrder.id,
+              shopifyOrderId: String(shopifyOrder.id),
             },
           });
         }
+      } catch (shopifyErr) {
+        console.error(`[Shopify Async Sync Failed] Order ${createdOrder.id}:`, shopifyErr);
       }
-    );
+    })();
 
+    // 6. Return response with purchasedVariantIds for frontend store cleanup
     return res.status(200).json({
-      message:
-        "Payment verified successfully",
+      success: true,
+      message: "Payment verified, order created, and stock updated.",
+      orderId: createdOrder.id,
+      purchasedVariantIds,
     });
-
-  } catch (err: any) {
-
-    console.error(
-      "Verify payment error:",
-      err
-    );
-
-    return res.status(500).json({
-      message:
-        err?.message ||
-        "Failed to verify payment",
-    });
+    */
+  } catch (error: any) {
+    console.error("[Payment Verification Error]:", error);
+    return res.status(500).json({ success: false, message: error.message || "Internal server error." });
   }
 }

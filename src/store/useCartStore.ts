@@ -32,6 +32,7 @@ interface CartStore {
   clearCart: () => void;
   getSelectedItems: () => LocalCartItem[];
   getSelectedSubtotal: () => number;
+  clearPurchasedItems: (purchasedVariantIds: string[]) => void;
 }
 
 export const useCartStore = create<CartStore>()(
@@ -68,6 +69,13 @@ export const useCartStore = create<CartStore>()(
           cart: state.cart.filter((i) => i.variantId !== variantId),
         }));
       },
+      
+      clearPurchasedItems: (purchasedVariantIds: string[]) =>
+      set((state) => ({
+        cart: state.cart.filter(
+          (item) => !purchasedVariantIds.includes(item.variantId)
+        ),
+      })),
 
       updateQuantity: (variantId, targetQuantity) => {
         if (targetQuantity <= 0) {
