@@ -97,6 +97,7 @@ export default async function handler(
         price: itemPriceInPaise,
         offer_price: itemPriceInPaise,
         quantity: item.quantity,
+        weight: 500,
       };
     });
 
@@ -112,6 +113,7 @@ export default async function handler(
       notes: {
         checkoutSessionId: checkoutSession.id,
         userId: userId || "GUEST",
+        country: "IN",
       },
     } as any);
 

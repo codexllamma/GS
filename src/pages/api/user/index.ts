@@ -1,94 +1,120 @@
-import { NextApiRequest, NextApiResponse } from "next";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]";
-import prisma from "@/lib/prisma";
+import type { NextApiRequest, NextApiResponse } from "next";
+import Razorpay from "razorpay";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session?.user?.id) {
-    return res.status(401).json({ message: "Unauthorized" });
+// Initialize Razorpay instance using Server Environment Variables
+const razorpay = new Razorpay({
+  key_id: (process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID)!,
+  key_secret: process.env.RAZORPAY_KEY_SECRET!,
+});
+
+interface CartItem {
+  id?: string;
+  variantId?: string;
+  productName?: string;
+  name?: string;
+  price: number;      // Amount in Rupees (e.g. 1499)
+  quantity: number;
+  size?: string;
+  weight?: number;    // Weight in kg or grams
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const userId = session.user.id;
-
   try {
-    if (req.method === "GET") {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          addresses: {
-            where: { isDefault: true },
-            take: 1,
-          },
-        },
-      });
+    const { cartItems, userId } = req.body || {};
 
-      if (!user) return res.status(404).json({ message: "User not found" });
-
-      return res.status(200).json({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        address: user.addresses?.[0] || null,
-      });
+    if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({ message: "Cart items are required" });
     }
 
-    if (req.method === "PUT") {
-      const { address } = req.body;
+    // 1. Map cart items into strict Razorpay + Shiprocket line_item format
+    const lineItems = cartItems.map((item: CartItem, index: number) => {
+      // Ensure SKU / Variant ID string exists
+      const rawVariantId = String(
+        item.variantId || item.id || `variant_${index + 1}`
+      );
 
-      if (
-        !address ||
-        !address.line1 ||
-        !address.city ||
-        !address.state ||
-        !address.postal ||
-        !address.country
-      ) {
-        return res.status(400).json({ message: "Incomplete address details" });
+      // Construct clean display name
+      const baseName = item.productName || item.name || "Product Item";
+      const fullName = item.size ? `${baseName} (${item.size})` : baseName;
+
+      // Price Conversion: Force positive integer in paise (e.g., ₹1499 -> 149900 paise)
+      const priceInPaise = Math.round(
+        item.price < 10000 ? item.price * 100 : item.price
+      );
+
+      // Package Weight: Shiprocket strictly requires weight in grams (default: 500g)
+      let weightInGrams = 500;
+      if (item.weight) {
+        weightInGrams =
+          item.weight < 20
+            ? Math.round(item.weight * 1000)
+            : Math.round(item.weight);
       }
 
-      const existingDefault = await prisma.address.findFirst({
-        where: { userId, isDefault: true },
-      });
+      return {
+        sku: rawVariantId,
+        variant_id: rawVariantId,
+        name: String(fullName),
+        price: priceInPaise,
+        offer_price: priceInPaise,
+        quantity: Number(item.quantity) || 1,
+        weight: weightInGrams,
+      };
+    });
 
-      let updatedAddress;
-      if (existingDefault) {
-        
-        updatedAddress = await prisma.address.update({
-          where: { id: existingDefault.id },
-          data: {
-            line1: address.line1,
-            line2: address.line2,
-            city: address.city,
-            state: address.state,
-            postal: address.postal,
-            country: address.country,
-          },
-        });
-      } else {
-        
-        updatedAddress = await prisma.address.create({
-          data: {
-            userId,
-            line1: address.line1,
-            line2: address.line2,
-            city: address.city,
-            state: address.state,
-            postal: address.postal,
-            country: address.country,
-            isDefault: true,
-          },
-        });
-      }
+    // 2. Sum line items directly to prevent 1-paise floating-point rounding drift
+    const calculatedLineItemsTotal = lineItems.reduce(
+      (sum, item) => sum + item.offer_price * item.quantity,
+      0
+    );
 
-      return res.status(200).json(updatedAddress);
+    if (calculatedLineItemsTotal <= 0) {
+      return res.status(400).json({ message: "Invalid cart total amount" });
     }
 
-    
-    res.setHeader("Allow", ["GET", "PUT"]);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
-  } catch (error) {
-    console.error("User API error:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    const receiptId = `rcpt_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 7)}`;
+
+    // 3. Construct Razorpay Order Payload for Magic Checkout
+    const orderOptions = {
+      amount: calculatedLineItemsTotal,
+      currency: "INR",
+      receipt: receiptId,
+      line_items_total: calculatedLineItemsTotal, // MUST strictly equal sum of line items
+      line_items: lineItems,
+      notes: {
+        userId: String(userId || "GUEST"),
+        country: "IN", // Explicit ISO-2 Country Code
+        source: "nextjs_magic_checkout",
+      },
+    };
+
+    // 4. Create the Razorpay Order
+    const razorpayOrder = await razorpay.orders.create(orderOptions as any);
+
+    return res.status(200).json({
+      success: true,
+      orderId: razorpayOrder.id,
+      amount: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      keyId:
+        process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID,
+    });
+  } catch (error: any) {
+    console.error("Razorpay Magic Checkout Session Error:", error);
+    return res.status(500).json({
+      message:
+        error?.error?.description ||
+        error?.message ||
+        "Failed to create order session",
+    });
   }
 }
