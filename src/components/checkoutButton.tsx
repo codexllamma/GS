@@ -106,7 +106,7 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                checkoutSessionId: data.checkoutSessionId,
+                checkoutSessionId: data.sessionId || data.checkoutSessionId,
               }),
             });
 
