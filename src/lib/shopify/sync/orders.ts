@@ -15,7 +15,12 @@ export async function syncOrder(
       },
 
       include: {
-        user: true,
+        user: {
+          include: {
+            shopifyUserMapping: true,
+            addresses: true,
+          },
+        },
 
         address: true,
 

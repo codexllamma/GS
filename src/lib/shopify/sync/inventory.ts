@@ -1,15 +1,15 @@
 import { prisma } from "@/lib/prisma";
+import {
+  inventorySetQuantities,
+  getInventoryQuantity,
+} from "../services/inventory";
 
-import { inventorySetQuantities } from "../services/inventory";
-
-export async function syncInventory(
-  productId: string
-): Promise<void> {
+/**
+ * Bulk syncs inventory for ALL variants under a product
+ */
+export async function syncProductInventory(productId: string): Promise<void> {
   const product = await prisma.product.findUnique({
-    where: {
-      id: productId,
-    },
-
+    where: { id: productId },
     include: {
       variants: {
         include: {
@@ -20,45 +20,86 @@ export async function syncInventory(
   });
 
   if (!product) {
-    throw new Error("Product not found.");
+    throw new Error(`Product not found for ID: ${productId}`);
   }
 
-  const locationId =
-    process.env.SHOPIFY_LOCATION_ID;
-
+  const locationId = process.env.SHOPIFY_LOCATION_ID;
   if (!locationId) {
-    throw new Error(
-      "Missing SHOPIFY_LOCATION_ID."
-    );
+    throw new Error("Missing SHOPIFY_LOCATION_ID.");
   }
+
+  const mappedVariants = product.variants.filter(
+    (variant) => variant.shopifyMapping?.inventoryItemId
+  );
+
+  if (mappedVariants.length === 0) {
+    console.warn(`[SYNC PRODUCT INVENTORY] No mapped variants found for product ${productId}. Skipping.`);
+    return;
+  }
+
+  // Fetch current live stock for each variant on Shopify
+  const quantities = await Promise.all(
+    mappedVariants.map(async (variant) => {
+      const inventoryItemId = variant.shopifyMapping!.inventoryItemId;
+      const currentShopifyQty = await getInventoryQuantity(inventoryItemId, locationId);
+
+      return {
+        inventoryItemId,
+        locationId,
+        changeFromQuantity: currentShopifyQty,
+        quantity: variant.stock,
+      };
+    })
+  );
 
   await inventorySetQuantities({
     name: "available",
-
     reason: "correction",
+    quantities,
+  });
+}
 
-    quantities: product.variants.map(
-      (variant) => {
-        if (
-          !variant.shopifyMapping ||
-          !variant.shopifyMapping.inventoryItemId
-        ) {
-          throw new Error(
-            `Variant ${variant.id} has not been synchronized with Shopify inventory.`
-          );
-        }
+/**
+ * Targeted sync for a SINGLE variant
+ */
+export async function syncVariantInventory(variantId: string): Promise<void> {
+  const variant = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    include: {
+      shopifyMapping: true,
+    },
+  });
 
-        return {
-          inventoryItemId:
-            variant.shopifyMapping.inventoryItemId,
+  if (!variant) {
+    throw new Error(`Variant not found for ID: ${variantId}`);
+  }
 
-          locationId,
+  if (!variant.shopifyMapping?.inventoryItemId) {
+    throw new Error(
+      `Variant ${variantId} has not been synchronized with Shopify inventory.`
+    );
+  }
 
-          changeFromQuantity: 0,
+  const locationId = process.env.SHOPIFY_LOCATION_ID;
+  if (!locationId) {
+    throw new Error("Missing SHOPIFY_LOCATION_ID.");
+  }
 
-          quantity: variant.stock,
-        };
-      }
-    ),
+  const inventoryItemId = variant.shopifyMapping.inventoryItemId;
+
+  // Fetch current live stock from Shopify to satisfy changeFromQuantity requirement
+  const currentShopifyQty = await getInventoryQuantity(inventoryItemId, locationId);
+
+  await inventorySetQuantities({
+    name: "available",
+    reason: "correction",
+    quantities: [
+      {
+        inventoryItemId,
+        locationId,
+        changeFromQuantity: currentShopifyQty,
+        quantity: variant.stock,
+      },
+    ],
   });
 }

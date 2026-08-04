@@ -3,6 +3,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { syncOrder } from "@/lib/shopify/sync/orders";
+import { syncVariantInventory } from "@/lib/shopify/sync/inventory";
 
 interface CartSnapshotItem {
   variantId: string;
@@ -132,14 +134,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       rawAddress.zipcode || rawAddress.pincode || rawAddress.postal || session.pincode || "";
     const country = rawAddress.country || "India";
 
+    const bodyName =
+      req.body.name && typeof req.body.name === "string"
+        ? req.body.name.trim().replace(/\s+/g, " ")
+        : null;
+
+    const derivedEmailName = customerEmail
+      ? customerEmail.split("@")[0].replace(/[0-9_.-]+/g, " ").trim()
+      : null;
+
     const fullName =
+      bodyName ||
       rawAddress.name ||
       `${rawAddress.first_name || ""} ${rawAddress.last_name || ""}`.trim() ||
-      "HIÈR Customer";
+      derivedEmailName ||
+      "Valued Customer";
 
     // 4. Prisma Atomic Transaction
     const { createdOrder, purchasedVariantIds } = await prisma.$transaction(async (tx) => {
-      // Step A: Upsert User (Create if missing, preserve if existing)
+      // Step A: Upsert User
       let user = null;
       const searchCriteria = customerEmail
         ? { email: customerEmail }
@@ -150,7 +163,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (searchCriteria) {
         user = await tx.user.upsert({
           where: searchCriteria,
-          update: {}, // Do nothing if user exists
+          update: {
+            ...(fullName && fullName !== "Valued Customer" ? { name: fullName } : {}),
+          },
           create: {
             email: customerEmail || undefined,
             phoneNumber: customerPhone || undefined,
@@ -197,7 +212,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
 
-      // Step D: Decrement Variant Stock Levels
+      // Step D: Decrement Variant Stock Levels locally
       for (const item of cartSnapshot) {
         await tx.productVariant.update({
           where: { id: item.variantId },
@@ -218,6 +233,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         purchasedVariantIds: cartSnapshot.map((item) => item.variantId),
       };
     });
+
+    // 5. Background Shopify Auto-Sync (Non-blocking)
+    (async () => {
+      try {
+        console.log(`[SHOPIFY AUTO-SYNC] Syncing Order ${createdOrder.id}`);
+
+        // Sync order & customer profile to Shopify
+        await syncOrder(createdOrder.id);
+
+        // Sync stock levels for each purchased variant
+        for (const variantId of purchasedVariantIds) {
+          await syncVariantInventory(variantId);
+        }
+
+        console.log(`[SHOPIFY AUTO-SYNC SUCCESS] Completed for Order ${createdOrder.id}`);
+      } catch (syncErr) {
+        console.error(`[SHOPIFY AUTO-SYNC ERROR] Order ${createdOrder.id} sync failed:`, syncErr);
+      }
+    })();
 
     console.log("================ [VERIFY-PAYMENT END SUCCESS] ================");
 

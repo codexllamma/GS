@@ -15,9 +15,9 @@ export default async function handler(
   try {
     const { orderId } = req.body;
 
-    const order = await syncOrder(orderId);
+    const shopifyOrder = await syncOrder(orderId);
 
-    return res.status(200).json(order);
+    return res.status(200).json(shopifyOrder);
   } catch (error) {
     console.error(error);
 

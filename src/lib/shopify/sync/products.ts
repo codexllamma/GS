@@ -4,7 +4,7 @@ import { mapProductToProductSetInput } from "../mappers/products";
 import { syncShopifyProduct } from "../services/products";
 import { ShopifyProduct } from "../types/products";
 import { persistProductMappings } from "../services/mappings";
-import { syncInventory } from "./inventory";
+import { syncProductInventory } from "./inventory";
 
 
 export async function syncProduct(
@@ -39,7 +39,7 @@ export async function syncProduct(
   shopifyProduct
   );
 
-  await syncInventory(product.id);
+  await syncProductInventory(product.id);
   return shopifyProduct;
 
 

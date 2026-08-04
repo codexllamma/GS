@@ -63,19 +63,28 @@ export async function persistProductMappings(
 }
 
 export async function persistOrderMappings(
-    order: OrderAggregate,
-    shopifyOrder: ShopifyOrder
+  order: OrderAggregate,
+  shopifyOrder: ShopifyOrder
 ): Promise<void> {
-    await prisma.shopifyOrderMapping.upsert({
-        where: {
-            orderId: order.id,
-        },
-        update: {
-            shopifyOrderId: shopifyOrder.id,
-        },
-        create: {
-            orderId: order.id,
-            shopifyOrderId: shopifyOrder.id,
-        },
+  // 1. Persist Order Mapping
+  await prisma.shopifyOrderMapping.upsert({
+    where: { orderId: order.id },
+    update: { shopifyOrderId: shopifyOrder.id },
+    create: {
+      orderId: order.id,
+      shopifyOrderId: shopifyOrder.id,
+    },
+  });
+
+  // 2. Persist Customer Mapping
+  if (order.user?.id && shopifyOrder.customer?.id) {
+    await prisma.shopifyUserMapping.upsert({
+      where: { userId: order.user.id },
+      update: { shopifyCustomerId: shopifyOrder.customer.id },
+      create: {
+        userId: order.user.id,
+        shopifyCustomerId: shopifyOrder.customer.id,
+      },
     });
+  }
 }

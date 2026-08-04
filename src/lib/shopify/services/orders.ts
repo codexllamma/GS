@@ -19,23 +19,19 @@ mutation OrderCreate(
       id
       name
       number
-
+      customer {
+        id
+        email
+      }
       lineItems(first: 100) {
         nodes {
           id
           quantity
-
-          variant {
-            id
-          }
-
-          product {
-            id
-          }
+          variant { id }
+          product { id }
         }
       }
     }
-
     userErrors {
       field
       message

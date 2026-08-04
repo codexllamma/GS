@@ -23,6 +23,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  shopifyUserMapping ShopifyUserMapping?
   addresses        Address[]
   accounts         Account[]
   carts            Cart[]
@@ -331,6 +332,16 @@ model ShopifyOrderMapping {
   updatedAt DateTime @updatedAt
 
   @@index([shopifyOrderId])
+}
+
+model ShopifyUserMapping {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  shopifyCustomerId String   @unique
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 enum PaymentMethod {
