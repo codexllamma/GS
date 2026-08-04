@@ -1,13 +1,13 @@
+// pages/api/orders/[orderId].ts
+
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]";
 import prisma from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ message: "Unauthorized" });
-
   const { orderId } = req.query;
+
   if (!orderId || typeof orderId !== "string") {
     return res.status(400).json({ message: "Invalid order ID" });
   }
@@ -59,9 +59,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ message: "Order not found" });
       }
 
-      // 🔒 Role-based access control
-      if (!session.user.isAdmin && order.userId !== session.user.id) {
-        return res.status(403).json({ message: "Forbidden" });
+      // Optional session check: If logged in, ensure non-admins can't view others' orders.
+      // For guest checkouts (no session), allow viewing via unguessable UUID orderId.
+      const session = await getServerSession(req, res, authOptions);
+
+      if (session?.user && !session.user.isAdmin) {
+        // If user is logged in, restrict to their own order
+        if (order.userId && order.userId !== session.user.id) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
       }
 
       return res.status(200).json(order);
@@ -71,7 +77,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  // Unsupported HTTP method
   res.setHeader("Allow", ["GET"]);
   return res.status(405).end(`Method ${req.method} Not Allowed`);
 }

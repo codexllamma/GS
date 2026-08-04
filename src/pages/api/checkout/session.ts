@@ -123,6 +123,8 @@ export default async function handler(
       data: { razorpayOrderId: razorpayOrder.id },
     });
 
+    console.log("[CHECKOUT SESSION RESPONSE PAYLOAD]:", JSON.stringify(res.json, null, 2));
+
     return res.status(200).json({
       success: true,
       sessionId: checkoutSession.id,
