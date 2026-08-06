@@ -9,6 +9,7 @@ import { Toaster } from "react-hot-toast";
 
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
 
 function ClientHydrationWrapper({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -17,7 +18,7 @@ function ClientHydrationWrapper({ children }: { children: React.ReactNode }) {
     setReady(true);
   }, []);
 
-  if (!ready) return null; // stable first render
+  if (!ready) return null;
 
   return <>{children}</>;
 }
@@ -40,6 +41,23 @@ export default function App({
 
   return (
     <SessionProvider session={session}>
+      {/* Microsoft Clarity Script */}
+      {CLARITY_PROJECT_ID && (
+        <Script
+          id="microsoft-clarity"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(c,l,a,r,i,t,y){
+                  c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                  t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                  y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+              })(window, document, "clarity", "script", "${CLARITY_PROJECT_ID}");
+            `,
+          }}
+        />
+      )}
+
       {/* Meta Pixel Base Script */}
       {META_PIXEL_ID && (
         <>

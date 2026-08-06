@@ -15,7 +15,7 @@ model User {
   password      String?
   email         String?   @unique
   emailVerified DateTime?
-  phoneNumber   String?   @unique
+  phoneNumber   String?  
   phoneVerified Boolean   @default(false)
   image         String?
   authProvider  String?
