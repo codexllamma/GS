@@ -16,7 +16,7 @@ interface CartSnapshotItem {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log("================ [VERIFY-PAYMENT START] ================");
+  
 
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, message: "Method Not Allowed" });

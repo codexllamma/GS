@@ -205,10 +205,10 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-neutral-50">
       <div className="max-w-7xl mx-auto px-6 py-12">
         <button
-          onClick={() => router.push("/cart")}
+          onClick={() => router.push("/")}
           className="flex items-center text-sm text-neutral-600 mb-6 cursor-pointer hover:text-black transition"
         >
-          <ArrowLeft size={16} className="mr-2" /> Back to cart
+          <ArrowLeft size={16} className="mr-2" /> Back to Shopping
         </button>
 
         <div className="flex items-center justify-between mb-10">

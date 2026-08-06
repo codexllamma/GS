@@ -2,11 +2,10 @@
 
 import { useState, useRef } from "react";
 import Image from "next/image";
+import { useRouter } from "next/router";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Helper to fix Supabase URL spaces
 const getSafeUrl = (url: string) => {
   if (!url) return "";
   return url.replace(/ /g, "%20");
@@ -23,21 +22,18 @@ interface HeroCardProps {
 }
 
 export default function HeroCard({ product, priority = true }: HeroCardProps) {
+  const router = useRouter();
   const [currentImage, setCurrentImage] = useState(0);
   const [direction, setDirection] = useState(1);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   
-  // Ref to track if we have already background-loaded the images
   const hasPrefetched = useRef(false);
-
   const images = product.images || [];
 
-  // --- PREFETCH LOGIC (THE FIX) ---
-  // As soon as the user hovers the hero card, download the rest of the 4k images.
   const handleMouseEnter = () => {
     if (!hasPrefetched.current && images.length > 1) {
       images.forEach((img, idx) => {
-        if (idx === 0) return; // Skip the current one
+        if (idx === 0) return;
         const imgObj = new window.Image();
         imgObj.src = getSafeUrl(img.url);
       });
@@ -61,14 +57,22 @@ export default function HeroCard({ product, priority = true }: HeroCardProps) {
     setImgSrc(null);
   };
 
-  // URL Logic
+  // Triggers shallow URL push to open ProductModal on the single page
+  const handleOpenQuickView = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push(
+      { query: { ...router.query, product: product.id } },
+      undefined,
+      { shallow: true }
+    );
+  };
+
   const activeUrl = imgSrc || getSafeUrl(images[currentImage]?.url);
   const finalUrl = activeUrl || "https://placehold.co/800x1000/png?text=No+Image";
 
   return (
-    <Link
-      href={`/product/${product.id}`}
-      // Trigger the background download here
+    <div
+      onClick={handleOpenQuickView}
       onMouseEnter={handleMouseEnter}
       className="
         group relative block 
@@ -94,9 +98,7 @@ export default function HeroCard({ product, priority = true }: HeroCardProps) {
             src={finalUrl}
             alt={product.name}
             fill
-            // Keeps the server from crashing on large files
             unoptimized={true} 
-            // Hero images should usually be high priority
             priority={priority} 
             className="object-cover transition-all duration-700 group-hover:scale-[1.03] group-hover:brightness-[1.05]"
             sizes="(max-width: 768px) 100vw, 50vw"
@@ -168,6 +170,6 @@ export default function HeroCard({ product, priority = true }: HeroCardProps) {
           </button>
         </>
       )}
-    </Link>
+    </div>
   );
 }

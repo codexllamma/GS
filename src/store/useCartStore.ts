@@ -7,7 +7,7 @@ export interface LocalCartItem {
   name: string;
   size: string;
   price: number;
-  stock: number; // Added stock property
+  stock: number;
   quantity: number;
   image?: string;
   fabric?: string;
@@ -24,9 +24,13 @@ export interface LocalCartItem {
 interface CartStore {
   cart: LocalCartItem[];
   addToCart: (item: Omit<LocalCartItem, "selected">) => void;
+  buyNow: (item: Omit<LocalCartItem, "selected">) => void;
   removeFromCart: (variantId: string) => void;
   updateQuantity: (variantId: string, targetQuantity: number) => void;
-  updateVariant: (oldVariantId: string, newVariant: { id: string; size: string; price?: number; stock: number }) => void;
+  updateVariant: (
+    oldVariantId: string,
+    newVariant: { id: string; size: string; price?: number; stock: number }
+  ) => void;
   toggleSelect: (variantId: string) => void;
   toggleSelectAll: (select: boolean) => void;
   clearCart: () => void;
@@ -40,6 +44,7 @@ export const useCartStore = create<CartStore>()(
     (set, get) => ({
       cart: [],
 
+      // Standard Add to Cart: Keeps existing items selected, increments quantity
       addToCart: (newItem) => {
         set((state) => {
           const existingIdx = state.cart.findIndex(
@@ -50,16 +55,64 @@ export const useCartStore = create<CartStore>()(
             const updated = [...state.cart];
             const currentQty = updated[existingIdx].quantity;
             const maxStock = updated[existingIdx].stock;
-            // Cap quantity at max stock
-            updated[existingIdx].quantity = Math.min(currentQty + newItem.quantity, maxStock);
+            updated[existingIdx].quantity = Math.min(
+              currentQty + newItem.quantity,
+              maxStock
+            );
             updated[existingIdx].selected = true;
             return { cart: updated };
           }
 
-          // Initial add capped at max stock
           const initialQty = Math.min(newItem.quantity, newItem.stock);
           return {
-            cart: [...state.cart, { ...newItem, quantity: initialQty, selected: true }],
+            cart: [
+              ...state.cart,
+              { ...newItem, quantity: initialQty, selected: true },
+            ],
+          };
+        });
+      },
+
+      // Buy Now: Deselects all existing cart items, selects ONLY this item
+      buyNow: (newItem) => {
+        set((state) => {
+          // 1. Uncheck every item currently in the cart
+          const deselectedCart = state.cart.map((item) => ({
+            ...item,
+            selected: false,
+          }));
+
+          // 2. Check if the variant is already present
+          const existingIndex = deselectedCart.findIndex(
+            (item) => item.variantId === newItem.variantId
+          );
+
+          if (existingIndex > -1) {
+            const updated = [...deselectedCart];
+            const maxStock = updated[existingIndex].stock;
+            // Ensure at least requested quantity is available and selected
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              quantity: Math.min(
+                Math.max(updated[existingIndex].quantity, newItem.quantity),
+                maxStock
+              ),
+              selected: true,
+            };
+            return { cart: updated };
+          }
+
+          // 3. Append as the single active/selected item
+          const initialQty = Math.min(newItem.quantity, newItem.stock);
+          return {
+            cart: [
+              ...deselectedCart,
+              {
+                ...newItem,
+                quantity: initialQty,
+                selected: true,
+              },
+            ],
           };
         });
       },
@@ -69,13 +122,14 @@ export const useCartStore = create<CartStore>()(
           cart: state.cart.filter((i) => i.variantId !== variantId),
         }));
       },
-      
-      clearPurchasedItems: (purchasedVariantIds: string[]) =>
-      set((state) => ({
-        cart: state.cart.filter(
-          (item) => !purchasedVariantIds.includes(item.variantId)
-        ),
-      })),
+
+      clearPurchasedItems: (purchasedVariantIds: string[]) => {
+        set((state) => ({
+          cart: state.cart.filter(
+            (item) => !purchasedVariantIds.includes(item.variantId)
+          ),
+        }));
+      },
 
       updateQuantity: (variantId, targetQuantity) => {
         if (targetQuantity <= 0) {
@@ -86,7 +140,6 @@ export const useCartStore = create<CartStore>()(
         set((state) => ({
           cart: state.cart.map((item) => {
             if (item.variantId !== variantId) return item;
-            // Strictly cap requested quantity to available stock
             const cappedQuantity = Math.min(targetQuantity, item.stock);
             return { ...item, quantity: cappedQuantity };
           }),
@@ -104,7 +157,7 @@ export const useCartStore = create<CartStore>()(
               size: newVariant.size,
               price: newVariant.price ?? item.price,
               stock: newStock,
-              quantity: Math.min(item.quantity, newStock), // Re-cap quantity for new variant stock
+              quantity: Math.min(item.quantity, newStock),
             };
           }),
         }));

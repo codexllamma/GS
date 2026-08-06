@@ -2,11 +2,10 @@
 
 import { useState, useRef } from "react";
 import Image from "next/image";
+import { useRouter } from "next/router";
 import { ShoppingBag, ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 
-// Helper to fix Supabase URL spaces
 const getSafeUrl = (url: string) => {
   if (!url) return "";
   return url.replace(/ /g, "%20");
@@ -27,25 +26,18 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
-  // Standard state for the carousel
+  const router = useRouter();
   const [currentImage, setCurrentImage] = useState(0);
   const [direction, setDirection] = useState(1);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   
-  // Ref to track if we have already background-loaded the images
   const hasPrefetched = useRef(false);
-
   const images = product.images || [];
 
-  // --- THE PREFETCH FIX ---
-  // Triggers as soon as mouse enters the card area.
   const handleMouseEnter = () => {
-    // Only run this once per card lifecycle to save bandwidth
     if (!hasPrefetched.current && images.length > 1) {
       images.forEach((img, idx) => {
-        if (idx === 0) return; // Skip the one already showing
-        
-        // Force browser to download image into cache
+        if (idx === 0) return;
         const imgObj = new window.Image();
         imgObj.src = getSafeUrl(img.url);
       });
@@ -69,22 +61,29 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     setImgSrc(null);
   };
 
-  // URL Logic
+  // Triggers shallow URL push to open ProductModal on the single page
+  const handleOpenQuickView = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push(
+      { query: { ...router.query, product: product.id } },
+      undefined,
+      { shallow: true }
+    );
+  };
+
   const activeUrl = imgSrc || getSafeUrl(images[currentImage]?.url);
   const finalUrl = activeUrl || "https://placehold.co/600x800/png?text=No+Image";
 
   return (
     <div 
-      className="group relative flex flex-col cursor-pointer transition-transform duration-500 hover:scale-[1.005]"
-      // Triggers the background download of next images
+      onClick={handleOpenQuickView}
       onMouseEnter={handleMouseEnter} 
+      className="group relative flex flex-col cursor-pointer transition-transform duration-500 hover:scale-[1.005]"
     >
-      <Link
-        href={`/product/${product.id}`}
+      <div
         className="relative block w-full aspect-[3/5] sm:aspect-[4/5] md:aspect-[10/12]
           overflow-hidden bg-neutral-100 border border-neutral-200"
       >
-        {/* Standard Animation Engine (Always Mounted) */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={currentImage}
@@ -101,12 +100,9 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               src={finalUrl}
               alt={product.name}
               fill
-              // Keeps it stable. The "Prefetch" above handles the speed.
               unoptimized={true} 
               priority={priority} 
               className="object-cover transition-all duration-700 group-hover:scale-[1.02] group-hover:brightness-[1.05]"
-              // These sizes help the browser understand layout, 
-              // even if unoptimized={true} is on.
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               onError={() => {
                 setImgSrc("https://placehold.co/600x800/png?text=Image+Error");
@@ -115,7 +111,6 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           </motion.div>
         </AnimatePresence>
 
-        {/* Navigation Arrows */}
         {images.length > 1 && (
           <>
             <button
@@ -132,22 +127,21 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
             </button>
           </>
         )}
-      </Link>
+      </div>
 
-      {/* Product Details */}
       <div className="flex flex-col mt-3 px-1 select-none">
         <h3 className="font-apercu text-[1.05rem] font-medium tracking-tight line-clamp-1 group-hover:text-black transition-colors duration-200">
           {product.name}
         </h3>
         <div className="font-apercu flex items-center justify-between mt-1">
           <p className="text-[14px] text-gray-700">₹{product.basePrice}</p>
-          <Link
-            href={`/product/${product.id}`}
+          <button
+            onClick={handleOpenQuickView}
             className="flex items-center justify-center gap-1 border border-black text-black text-[13px] px-3 py-1 hover:bg-black hover:text-white transition-all duration-300"
           >
             <ShoppingBag size={13} />
             <span>Add</span>
-          </Link>
+          </button>
         </div>
       </div>
     </div>

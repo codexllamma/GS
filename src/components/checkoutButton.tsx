@@ -44,6 +44,32 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
 
     setLoading(true);
 
+    // --- Analytics Tracking: Initiate Checkout ---
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    if (typeof window !== "undefined" && (window as any).fbq) {
+      (window as any).fbq("track", "InitiateCheckout", {
+        content_ids: items.map((i) => i.productId || i.variantId),
+        num_items: items.reduce((sum, i) => sum + i.quantity, 0),
+        value: subtotal,
+        currency: "INR",
+      });
+    }
+
+    if (typeof window !== "undefined" && (window as any).gtag) {
+      (window as any).gtag("event", "begin_checkout", {
+        currency: "INR",
+        value: subtotal,
+        items: items.map((i) => ({
+          item_id: i.productId || i.variantId,
+          item_name: i.name,
+          item_variant: i.size,
+          price: i.price,
+          quantity: i.quantity,
+        })),
+      });
+    }
+
     try {
       // 1. Ensure Razorpay Script is loaded
       const scriptLoaded = await loadRazorpayScript();
