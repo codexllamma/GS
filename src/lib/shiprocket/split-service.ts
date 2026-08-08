@@ -27,17 +27,16 @@ async function getShiprocketToken(): Promise<string> {
 }
 
 export async function executeOrderSplit(internalOrderId: string) {
-  // Query order with nested variant and shopifyMapping inclusions
   const order = await prisma.order.findUnique({
     where: { id: internalOrderId },
     include: {
+      user: true,
+      address: true,
+      shopifyMapping: true,
       orderItems: {
         include: {
-          variant: {
-            include: {
-              shopifyMapping: true,
-            },
-          },
+          product: true,
+          variant: true,
         },
       },
     },
@@ -45,126 +44,183 @@ export async function executeOrderSplit(internalOrderId: string) {
 
   if (!order) throw new Error("Order not found in database.");
 
-  // Check if order was already processed
   const existingShipments = await prisma.shipment.findMany({
     where: { orderId: internalOrderId },
   });
   if (existingShipments.length > 0) {
-    return { success: true, message: "Order is already split.", shipments: existingShipments };
+    return { success: true, message: "Order is already processed.", shipments: existingShipments };
   }
 
-  const token = await getShiprocketToken();
-  const shiprocketChannelOrderId = order.razorpayOrderId || order.id.slice(0, 8);
+  // Sanitize raw Shopify GID
+  let rawOrderId =
+    order.shopifyMapping?.shopifyOrderId || order.razorpayOrderId || order.id.slice(0, 8);
+  if (rawOrderId.includes("/")) {
+    rawOrderId = rawOrderId.split("/").pop() || rawOrderId;
+  }
 
-  // Expand items into individual units using raw variantId (matching raw Shopify SKU)
-  const expandedUnits: Array<{ sku: string; price: number }> = [];
+  // Expand line items into individual units with orderItemId link
+  const expandedUnits: Array<{ orderItemId: string; name: string; sku: string; price: number }> = [];
   for (const item of order.orderItems) {
-    const sku = item.variantId; // Raw unsliced CUID matching Shopify SKU
     for (let q = 0; q < item.quantity; q++) {
-      expandedUnits.push({ sku, price: item.priceAtPurchase });
+      expandedUnits.push({
+        orderItemId: item.id,
+        name: item.product?.name || "Product Item",
+        sku: item.variantId,
+        price: item.priceAtPurchase,
+      });
     }
   }
 
   const totalUnits = expandedUnits.length;
   if (totalUnits === 0) throw new Error("Order has no line items.");
 
-  // CASE 1: 1 or 2 Items -> Patch Flyer Dimensions Only
-  if (totalUnits <= 2) {
-    const height = totalUnits === 1 ? 3 : 5;
-    const weight = Number((totalUnits * 0.245).toFixed(2));
+  const token = await getShiprocketToken();
 
-    const res = await fetch("https://apiv2.shiprocket.in/v1/external/orders/update/adhoc", {
+  const customerName = order.user?.name || "Customer";
+  const addressLine1 = order.address?.line1 || "Main Address";
+  const addressLine2 = order.address?.line2 || "";
+  const city = order.address?.city || "City";
+  const state = order.address?.state || "State";
+  const pincode = order.address?.postal || "000000";
+  const email = order.user?.email || "customer@example.com";
+  const phone = order.user?.phoneNumber || "9999999999";
+  const paymentMethod = order.paymentMethod?.toUpperCase() === "COD" ? "COD" : "Prepaid";
+  const pickupLocation = process.env.SHIPROCKET_PICKUP_LOCATION || "Home";
+
+  const createdShipments = [];
+
+  // Chunk ANY order into sub-packages of maximum 2 items with explicit flyer dimensions
+  for (let i = 0; i < totalUnits; i += 2) {
+    const chunk = expandedUnits.slice(i, i + 2);
+    const count = chunk.length;
+    const subOrderId = `${rawOrderId}-${Math.floor(i / 2) + 1}`;
+    const subTotal = chunk.reduce((acc, u) => acc + u.price, 0);
+
+    const uniqueOrderItemIds = Array.from(new Set(chunk.map((u) => u.orderItemId)));
+
+    // Aggregate chunk units by SKU to prevent duplicate SKU entries
+    const skuMap = new Map<string, { name: string; sku: string; units: number; price: number }>();
+    for (const unit of chunk) {
+      const existing = skuMap.get(unit.sku);
+      if (existing) {
+        existing.units += 1;
+      } else {
+        skuMap.set(unit.sku, {
+          name: unit.name,
+          sku: unit.sku,
+          units: 1,
+          price: unit.price,
+        });
+      }
+    }
+
+    const orderItemsPayload = Array.from(skuMap.values()).map((item) => ({
+      name: item.name,
+      sku: item.sku,
+      units: item.units,
+      selling_price: String(item.price),
+      discount: "",
+      tax: "",
+    }));
+
+    const adhocPayload = {
+      order_id: subOrderId,
+      order_date: new Date().toISOString().slice(0, 10),
+      pickup_location: pickupLocation,
+      comment: `Package ${Math.floor(i / 2) + 1} for Order #${rawOrderId}`,
+      billing_customer_name: customerName,
+      billing_last_name: "",
+      billing_address: addressLine1,
+      billing_address_2: addressLine2,
+      billing_city: city,
+      billing_pincode: pincode,
+      billing_state: state,
+      billing_country: "India",
+      billing_email: email,
+      billing_phone: phone,
+      shipping_is_billing: true,
+      payment_method: paymentMethod,
+      sub_total: subTotal,
+      length: 22,
+      breadth: 18,
+      height: count === 1 ? 3 : 5,
+      weight: Number((count * 0.245).toFixed(2)),
+      order_items: orderItemsPayload,
+    };
+
+    const res = await fetch("https://apiv2.shiprocket.in/v1/external/orders/create/adhoc", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        order_id: shiprocketChannelOrderId,
-        length: 22,
-        width: 18,
-        height,
-        weight,
-      }),
+      body: JSON.stringify(adhocPayload),
     });
 
     const result = await res.json();
-    if (!res.ok) throw new Error(`Shiprocket patch error: ${JSON.stringify(result)}`);
 
-    const shipment = await prisma.shipment.create({
+    if (!res.ok || (!result.order_id && !result.shipment_id)) {
+      throw new Error(`Failed to create package sub-order ${subOrderId}: ${JSON.stringify(result)}`);
+    }
+
+    const created = await prisma.shipment.create({
       data: {
         orderId: internalOrderId,
-        shiprocketOrderId: shiprocketChannelOrderId,
+        shiprocketOrderId: String(result.order_id || subOrderId),
         shiprocketShipmentId: String(result.shipment_id || ""),
-        status: "DIMENSIONS_UPDATED",
+        status: "PACKAGE_CREATED",
+        orderItems: {
+          connect: uniqueOrderItemIds.map((id) => ({ id })),
+        },
       },
     });
 
-    return { success: true, shipments: [shipment] };
+    createdShipments.push(created);
   }
 
-  // CASE 2: 3+ Items -> Split Into Packages of Max 2 Items Each
-  const shipmentsPayload = [];
-  for (let i = 0; i < totalUnits; i += 2) {
-    const chunk = expandedUnits.slice(i, i + 2);
-    const count = chunk.length;
+  // Clean up raw channel master order imported automatically by Shopify channel sync
+  try {
+    const searchRes = await fetch(
+      `https://apiv2.shiprocket.in/v1/external/orders?search=${encodeURIComponent(rawOrderId)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    const searchData = await searchRes.json();
+    const foundOrders: any[] = searchData?.data || [];
 
-    // Consolidate duplicate SKUs inside the package
-    const skuMap = new Map<string, number>();
-    for (const unit of chunk) {
-      skuMap.set(unit.sku, (skuMap.get(unit.sku) || 0) + 1);
+    const toCancelIds: number[] = [];
+
+    for (const srOrder of foundOrders) {
+      const srChannelId = String(srOrder.channel_order_id || "");
+      const srStatus = String(srOrder.status || "").toLowerCase();
+
+      // Strictly match master channel order ID and exclude sub-orders
+      const matchesMasterOrder = srChannelId.includes(rawOrderId);
+      const isChildOrder = srChannelId.includes("-");
+      const isAlreadyCanceled = srStatus.includes("cancel");
+
+      if (matchesMasterOrder && !isChildOrder && !isAlreadyCanceled) {
+        toCancelIds.push(srOrder.id);
+      }
     }
 
-    shipmentsPayload.push({
-      order_items: Array.from(skuMap.entries()).map(([sku, quantity]) => ({ sku, quantity })),
-      length: 22,
-      width: 18,
-      height: count === 1 ? 3 : 5,
-      weight: Number((count * 0.245).toFixed(2)),
-    });
-  }
-
-  const res = await fetch("https://apiv2.shiprocket.in/v1/external/orders/split", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      order_id: shiprocketChannelOrderId,
-      shipment: shipmentsPayload,
-    }),
-  });
-
-  const result = await res.json();
-  if (!res.ok) throw new Error(`Shiprocket split failed: ${JSON.stringify(result)}`);
-
-  const createdShipments = [];
-  const splitPackages = result.shipments || result.data || [];
-
-  if (Array.isArray(splitPackages) && splitPackages.length > 0) {
-    for (const pkg of splitPackages) {
-      const created = await prisma.shipment.create({
-        data: {
-          orderId: internalOrderId,
-          shiprocketOrderId: String(pkg.order_id || shiprocketChannelOrderId),
-          shiprocketShipmentId: String(pkg.shipment_id || ""),
-          status: "SPLIT_CREATED",
+    if (toCancelIds.length > 0) {
+      const cancelRes = await fetch("https://apiv2.shiprocket.in/v1/external/orders/cancel", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ ids: toCancelIds }),
       });
-      createdShipments.push(created);
+      const cancelData = await cancelRes.json();
+      console.log(`[SHIPROCKET CLEANUP]: Cancelled raw channel master order ID(s) ${toCancelIds.join(", ")}:`, cancelData);
+    } else {
+      console.log(`[SHIPROCKET CLEANUP]: No un-cancelled master order found matching '${rawOrderId}'.`);
     }
-  } else {
-    for (let idx = 0; idx < shipmentsPayload.length; idx++) {
-      const created = await prisma.shipment.create({
-        data: {
-          orderId: internalOrderId,
-          shiprocketOrderId: `${shiprocketChannelOrderId}-${idx + 1}`,
-          status: "SPLIT_CREATED",
-        },
-      });
-      createdShipments.push(created);
-    }
+  } catch (e) {
+    console.warn("[SHIPROCKET MASTER CLEANUP WARN]: Master order cancellation skipped.", e);
   }
 
   return { success: true, shipments: createdShipments };

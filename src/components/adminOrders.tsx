@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Layers,
   ExternalLink,
-  Tag,
   Copy,
   Check,
   Search,
@@ -200,6 +199,41 @@ export default function AdminOrders() {
     }
   };
 
+  const handleAssignAwb = async (shipmentId: string) => {
+    setProcessingId(`AWB-${shipmentId}`);
+    try {
+      const res = await fetch(`/api/admin/shipments/${shipmentId}/assign-awb`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`AWB Assigned! Code: ${data.shipment.awbCode}`);
+        fetchOrders();
+      } else {
+        alert(`AWB Assignment Error: ${data.message}`);
+      }
+    } catch (err) {
+      alert("Failed to assign AWB.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handlePrintLabel = async (shipmentId: string) => {
+    setProcessingId(`LABEL-${shipmentId}`);
+    try {
+      const res = await fetch(`/api/admin/shipments/${shipmentId}/label`);
+      const data = await res.json();
+      if (res.ok && data.labelUrl) {
+        window.open(data.labelUrl, "_blank");
+      } else {
+        alert(`Label Error: ${data.message || "Failed to fetch label"}`);
+      }
+    } catch (err) {
+      alert("Failed to fetch shipping label.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const downloadLabels = async () => {
     try {
       const res = await fetch("/api/admin/labels/download-today");
@@ -209,7 +243,7 @@ export default function AdminOrders() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `labels-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.download = `labels-${new Date().toISOString().slice(0, 10)}.pdf`;
       a.click();
     } catch (err) {
       console.error(err);
@@ -583,9 +617,9 @@ export default function AdminOrders() {
                                     </div>
 
                                     <div className="flex items-center gap-2 w-full sm:w-auto">
-                                      {pkg.trackingUrl ? (
+                                      {pkg.awbCode ? (
                                         <a
-                                          href={pkg.trackingUrl}
+                                          href={pkg.trackingUrl || `https://shiprocket.co/tracking/${pkg.awbCode}`}
                                           target="_blank"
                                           rel="noreferrer"
                                           className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-md text-xs font-bold transition"
@@ -594,18 +628,22 @@ export default function AdminOrders() {
                                         </a>
                                       ) : (
                                         <button
-                                          disabled
-                                          className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-gray-50 border border-gray-200 text-gray-400 px-3 py-1.5 rounded-md text-xs font-bold cursor-not-allowed"
+                                          onClick={() => handleAssignAwb(pkg.id)}
+                                          disabled={processingId === `AWB-${pkg.id}`}
+                                          className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-bold transition shadow-xs disabled:opacity-50"
                                         >
-                                          <ExternalLink size={13} /> AWB Pending
+                                          <Truck size={13} className={processingId === `AWB-${pkg.id}` ? "animate-spin" : ""} />
+                                          {processingId === `AWB-${pkg.id}` ? "Assigning..." : "Assign AWB"}
                                         </button>
                                       )}
 
                                       <button
-                                        onClick={() => alert(`Label fetch triggered for package ${pkg.shiprocketOrderId}`)}
+                                        onClick={() => handlePrintLabel(pkg.id)}
+                                        disabled={processingId === `LABEL-${pkg.id}`}
                                         className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold transition"
                                       >
-                                        <FileText size={13} /> Print Label
+                                        <FileText size={13} className={processingId === `LABEL-${pkg.id}` ? "animate-spin" : ""} />
+                                        {processingId === `LABEL-${pkg.id}` ? "Fetching..." : "Print Label"}
                                       </button>
                                     </div>
                                   </div>
