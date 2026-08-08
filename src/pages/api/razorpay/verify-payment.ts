@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { syncOrder } from "@/lib/shopify/sync/orders";
 import { syncVariantInventory } from "@/lib/shopify/sync/inventory";
+import { sendMetaCapiPurchase } from "@/lib/meta/capi";
 
 interface CartSnapshotItem {
   variantId: string;
@@ -261,6 +262,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log(`[SHOPIFY AUTO-SYNC SUCCESS] Completed for Order ${createdOrder.id}`);
     } catch (syncErr) {
       console.error(`[SHOPIFY AUTO-SYNC ERROR] Order ${createdOrder.id} sync failed:`, syncErr);
+    }
+
+    // 6. Meta CAPI Purchase Trigger
+    try {
+      console.log(`[META CAPI] Triggering Purchase event for Payment ID: ${razorpay_payment_id}`);
+
+      const clientIpHeader = req.headers["x-forwarded-for"];
+      const clientIp = typeof clientIpHeader === "string"
+        ? clientIpHeader.split(",")[0].trim()
+        : req.socket.remoteAddress;
+
+      await sendMetaCapiPurchase({
+        eventId: razorpay_payment_id,
+        totalAmount: createdOrder.total,
+        currency: "INR",
+        email: customerEmail || undefined,
+        phone: customerPhone || undefined,
+        clientIp: clientIp || undefined,
+        userAgent: req.headers["user-agent"],
+      });
+
+      console.log(`[META CAPI SUCCESS] Dispatched event for Order ${createdOrder.id}`);
+    } catch (capiErr) {
+      console.error(`[META CAPI ERROR] Order ${createdOrder.id} CAPI dispatch failed:`, capiErr);
     }
 
     console.log("================ [VERIFY-PAYMENT END SUCCESS] ================");
