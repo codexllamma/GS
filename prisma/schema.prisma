@@ -238,17 +238,6 @@ model OrderItem {
   product Product        @relation(fields: [productId], references: [id])
 }
 
-model ShipmentBatch {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
-  runAt     DateTime?
-  createdBy String?
-  status    BatchStatus @default(PENDING)
-  shipments Shipment[]
-
-  @@index([runAt])
-}
-
 enum BatchStatus {
   PENDING
   RUNNING
@@ -257,30 +246,20 @@ enum BatchStatus {
 }
 
 model Shipment {
-  id              String         @id @default(cuid())
-  orderId         String
-  orderItemId     String
-  sequenceIndex   Int
-  batchId         String?
-  awb             String?
-  labelUrl        String?
-  shippingService String?
-  weightKg        Float?
-  lengthCm        Float?
-  breadthCm       Float?
-  heightCm        Float?
-  pickupSlot      String?
-  status          ShipmentStatus @default(NOT_CREATED)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  events          ShipmentEvent[]
+  id                   String          @id @default(cuid())
+  orderId              String
+  order                Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shiprocketOrderId    String          // e.g., "1016-1" or Shiprocket's sub-order ID
+  shiprocketShipmentId String?         // Unique shipment ID returned by Shiprocket
+  awbCode              String?         // Waybill number once assigned
+  courierName          String?
+  trackingUrl          String?
+  status               String          @default("CREATED") // CREATED, MANIFESTED, SHIPPED, DELIVERED
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
-  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderItem OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  batch     ShipmentBatch? @relation(fields: [batchId], references: [id])
-
-  @@unique([orderItemId, sequenceIndex])
-  @@index([awb])
+  orderItems           OrderItem[]
+  events               ShipmentEvent[]
 }
 
 model ShipmentEvent {
