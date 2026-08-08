@@ -1,5 +1,3 @@
-// pages/api/razorpay/verify-payment.ts
-
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
@@ -16,8 +14,6 @@ interface CartSnapshotItem {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  
-
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, message: "Method Not Allowed" });
   }
@@ -152,26 +148,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 4. Prisma Atomic Transaction
     const { createdOrder, purchasedVariantIds } = await prisma.$transaction(async (tx) => {
-      // Step A: Upsert User
+      // Step A: Upsert User (Safely branch on unique vs non-unique key)
       let user = null;
-      const searchCriteria = customerEmail
-        ? { email: customerEmail }
-        : customerPhone
-        ? { phoneNumber: customerPhone }
-        : null;
 
-      if (searchCriteria) {
+      if (customerEmail) {
         user = await tx.user.upsert({
-          where: searchCriteria,
+          where: { email: customerEmail },
           update: {
             ...(fullName && fullName !== "Valued Customer" ? { name: fullName } : {}),
+            ...(customerPhone ? { phoneNumber: customerPhone } : {}),
           },
           create: {
-            email: customerEmail || undefined,
+            email: customerEmail,
             phoneNumber: customerPhone || undefined,
             name: fullName,
           },
         });
+      } else if (customerPhone) {
+        const existingUser = await tx.user.findFirst({
+          where: { phoneNumber: customerPhone },
+        });
+
+        if (existingUser) {
+          user = await tx.user.update({
+            where: { id: existingUser.id },
+            data: {
+              ...(fullName && fullName !== "Valued Customer" ? { name: fullName } : {}),
+            },
+          });
+        } else {
+          user = await tx.user.create({
+            data: {
+              phoneNumber: customerPhone,
+              name: fullName,
+            },
+          });
+        }
       }
 
       // Step B: Create Address
@@ -234,7 +246,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    // 5. Shopify Auto-Sync (Awaited with try/catch so serverless containers do not freeze execution)
+    // 5. Shopify Auto-Sync
     try {
       console.log(`[SHOPIFY AUTO-SYNC] Syncing Order ${createdOrder.id}`);
 
