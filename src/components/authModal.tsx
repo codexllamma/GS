@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+  const router = useRouter();
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -45,9 +48,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     onClose();
   };
 
+  // --- GOOGLE SIGN-IN HANDLER ---
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const redirectIntent =
+        typeof window !== "undefined"
+          ? localStorage.getItem("redirectIntent") || "/dashboard"
+          : "/dashboard";
+
+      // Clear stored redirect intent after reading
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("redirectIntent");
+      }
+
+      await signIn("google", { callbackUrl: redirectIntent });
+    } catch (err: any) {
+      setError("Google sign-in failed. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  // --- PHONE OTP SEND HANDLER ---
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneNumber || phoneNumber.replace(/\D/g, "").length < 10) {
+    const cleanNumber = phoneNumber.replace(/\D/g, "");
+
+    if (!cleanNumber || cleanNumber.length < 10) {
       setError("Please enter a valid 10-digit mobile number");
       return;
     }
@@ -60,7 +89,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       const res = await fetch("/api/auth/msg91/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber }),
+        body: JSON.stringify({ phoneNumber: cleanNumber }),
       });
       const data = await res.json();
 
@@ -79,6 +108,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  // --- PHONE OTP VERIFY HANDLER ---
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp || otp.length < 4) {
@@ -109,7 +139,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         });
 
         if (signInRes?.ok) {
+          // Merge cart if guest snapshot exists
+          try {
+            await fetch("/api/cart/merge-after-login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            });
+          } catch {}
+
+          const redirectIntent =
+            typeof window !== "undefined"
+              ? localStorage.getItem("redirectIntent") || "/dashboard"
+              : "/dashboard";
+
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("redirectIntent");
+          }
+
           handleClose();
+          router.push(redirectIntent);
         } else {
           setError("Failed to create user session. Please try again.");
         }
@@ -131,7 +179,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center font-apercu">
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center font-sans">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -317,8 +365,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             {/* Google Login Button */}
             <button
               type="button"
-              onClick={() => signIn("google")}
-              className="w-full h-12 border border-neutral-200 rounded-xl flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-wider text-neutral-700 hover:bg-neutral-50 hover:border-black transition cursor-pointer active:scale-[0.99] mb-2 sm:mb-0"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="w-full h-12 border border-neutral-200 rounded-xl flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-wider text-neutral-700 hover:bg-neutral-50 hover:border-black transition cursor-pointer active:scale-[0.99] mb-2 sm:mb-0 disabled:opacity-50"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path

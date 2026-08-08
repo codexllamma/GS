@@ -3,7 +3,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
-import prisma from "../../../lib/prisma"
+import prisma from "../../../lib/prisma";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -12,6 +12,7 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true, // FIX: Allows Google login for existing users in Prisma DB
     }),
 
     CredentialsProvider({
@@ -84,35 +85,30 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
 
-async signIn({ user, account }) {
-  try {
-    if (!account?.provider || !user.email) return false;
+    async signIn({ user, account }) {
+      try {
+        if (!account?.provider) return false;
 
-    // PRELAUNCH MODE CHECK (KEEP THIS)
-    const isPrelaunch = process.env.PRELAUNCH_MODE === "true";
-    if (isPrelaunch) {
-      const allowedUsers =
-        process.env.PRELAUNCH_ALLOWED_USERS?.split(",") || [];
-      const admins =
-        process.env.PRELAUNCH_ALLOWED_ADMIN?.split(",") || [];
+        // PRELAUNCH MODE CHECK
+        const isPrelaunch = process.env.PRELAUNCH_MODE === "true";
+        if (isPrelaunch && user.email) {
+          const allowedUsers =
+            process.env.PRELAUNCH_ALLOWED_USERS?.split(",") || [];
+          const admins =
+            process.env.PRELAUNCH_ALLOWED_ADMIN?.split(",") || [];
 
-      const isAllowed =
-        allowedUsers.includes(user.email) || admins.includes(user.email);
+          const isAllowed =
+            allowedUsers.includes(user.email) || admins.includes(user.email);
 
-      if (!isAllowed) throw new Error("PRELAUNCH_ACCESS_DENIED");
-    }
+          if (!isAllowed) throw new Error("PRELAUNCH_ACCESS_DENIED");
+        }
 
-    // 🔥 IMPORTANT: DO NOT MANUALLY CREATE USER OR ACCOUNT HERE.
-    // PrismaAdapter handles this automatically.
-
-    return true;
-  } catch (err) {
-    console.error("signIn error:", err);
-    return false;
-  }
-}
-
-,
+        return true;
+      } catch (err) {
+        console.error("signIn error:", err);
+        return false;
+      }
+    },
   },
 
   pages: {

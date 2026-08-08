@@ -26,12 +26,6 @@ async function getShiprocketToken(): Promise<string> {
   return data.token;
 }
 
-// Helper to construct uniform SKU matching Shopify variant exports
-function formatVariantSku(variantId: string): string {
-  const cleanId = variantId.replace(/[^a-zA-Z0-9]/g, "").slice(-8).toUpperCase();
-  return `SKU-${cleanId}`;
-}
-
 export async function executeOrderSplit(internalOrderId: string) {
   // Query order with nested variant and shopifyMapping inclusions
   const order = await prisma.order.findUnique({
@@ -62,10 +56,10 @@ export async function executeOrderSplit(internalOrderId: string) {
   const token = await getShiprocketToken();
   const shiprocketChannelOrderId = order.razorpayOrderId || order.id.slice(0, 8);
 
-  // Expand items into individual units for chunking
+  // Expand items into individual units using raw variantId (matching raw Shopify SKU)
   const expandedUnits: Array<{ sku: string; price: number }> = [];
   for (const item of order.orderItems) {
-    const sku = formatVariantSku(item.variantId);
+    const sku = item.variantId; // Raw unsliced CUID matching Shopify SKU
     for (let q = 0; q < item.quantity; q++) {
       expandedUnits.push({ sku, price: item.priceAtPurchase });
     }

@@ -38,6 +38,8 @@ export function mapProductToProductSetInput(
     ],
 
     variants: product.variants.map((variant) => ({
+      sku: variant.id, // Full raw unsliced DB variant ID (e.g. "cmo1iorjb001yla0b0quuiz15")
+
       optionValues: [
         {
           optionName: "Size",
