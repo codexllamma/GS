@@ -111,15 +111,26 @@ export function mapOrderToOrderCreateInput(
     shippingAddress: addressPayload,
     billingAddress: addressPayload,
 
-    lineItems: order.orderItems.map((item) => ({
-      quantity: item.quantity,
-      variantId: item.variant?.shopifyMapping?.shopifyVariantId ?? "",
-      priceSet: {
-        shopMoney: {
-          amount: item.priceAtPurchase.toFixed(2),
-          currencyCode: CURRENCY,
+    lineItems: order.orderItems.map((item) => {
+      const shopifyVariantId = item.variant?.shopifyMapping?.shopifyVariantId;
+
+      if (!shopifyVariantId) {
+        throw new Error(
+          `Variant ${item.variantId} on product ${item.productId} is missing Shopify mapping. Run syncProduct first.`
+        );
+      }
+
+      return {
+        quantity: item.quantity,
+        variantId: shopifyVariantId,
+        requiresShipping: true,
+        priceSet: {
+          shopMoney: {
+            amount: item.priceAtPurchase.toFixed(2),
+            currencyCode: CURRENCY,
+          },
         },
-      },
-    })),
+      };
+    }),
   };
 }

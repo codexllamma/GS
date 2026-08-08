@@ -148,7 +148,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 4. Prisma Atomic Transaction
     const { createdOrder, purchasedVariantIds } = await prisma.$transaction(async (tx) => {
-      // Step A: Upsert User (Safely branch on unique vs non-unique key)
+      // Step A: Upsert / Lookup User safely based on schema index constraint
       let user = null;
 
       if (customerEmail) {
@@ -172,7 +172,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (existingUser) {
           user = await tx.user.update({
             where: { id: existingUser.id },
-            update: {
+            data: {
               ...(fullName && fullName !== "Valued Customer" ? { name: fullName } : {}),
             },
           });
@@ -246,7 +246,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    // 5. Shopify Auto-Sync (Awaited with try/catch so serverless containers do not freeze execution)
+    // 5. Shopify Auto-Sync
     try {
       console.log(`[SHOPIFY AUTO-SYNC] Syncing Order ${createdOrder.id}`);
 

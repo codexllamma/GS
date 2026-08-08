@@ -1,5 +1,3 @@
-// types/orders.ts
-
 import { Prisma } from "@/generated/prisma";
 
 export type OrderAggregate = Prisma.OrderGetPayload<{
@@ -22,6 +20,7 @@ export type OrderAggregate = Prisma.OrderGetPayload<{
 export interface OrderLineItemInput {
   quantity: number;
   variantId: string;
+  requiresShipping?: boolean;
   priceSet: {
     shopMoney: {
       amount: string;
@@ -46,7 +45,7 @@ export interface OrderAddressInput {
 
 export interface OrderCreateInput {
   currency: string;
-  customerId?: string; // Updated: Allows linking directly to existing Shopify Customer IDs
+  customerId?: string; // Allows linking directly to existing Shopify Customer IDs
   lineItems: OrderLineItemInput[];
   billingAddress: OrderAddressInput;
   shippingAddress: OrderAddressInput;
@@ -66,7 +65,7 @@ export interface ShopifyOrder {
   id: string;
   name: string;
   number: number;
-  customer?: ShopifyCustomer | null; // Updated: Captures customer ID returned by Shopify orderCreate
+  customer?: ShopifyCustomer | null;
   lineItems: {
     nodes: {
       id: string;
@@ -83,7 +82,7 @@ export interface ShopifyOrder {
 
 export interface OrderCreateResponse {
   orderCreate: {
-    order: ShopifyOrder | null; // Updated: Made nullable to account for GraphQL userErrors
+    order: ShopifyOrder | null;
     userErrors: {
       field?: string[];
       message: string;
