@@ -1,0 +1,29 @@
+Folder PATH listing for volume Windows
+Volume serial number is 00000032 64EB:A5A8
+C:.
+¦   client.ts
+¦   config.ts
+¦   graphql.ts
+¦   rest.ts
+¦   structure.txt
+¦   
++---mappers
+¦       orders.ts
+¦       products.ts
+¦       
++---services
+¦       inventory.ts
+¦       mappings.ts
+¦       orders.ts
+¦       products.ts
+¦       
++---sync
+¦       inventory.ts
+¦       orders.ts
+¦       products.ts
+¦       
++---types
+¦       orders.ts
+¦       products.ts
+¦       
++---webhoooks

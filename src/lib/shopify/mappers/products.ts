@@ -6,6 +6,9 @@ import {
 export function mapProductToProductSetInput(
   product: ProductAggregate
 ): ProductSetInput {
+  // Extract category weight or default to 245.0 grams
+  const itemWeightGrams = product.fabric?.category?.weightGrams ?? 245.0;
+
   return {
     title: product.name,
 
@@ -46,6 +49,12 @@ export function mapProductToProductSetInput(
 
       inventoryItem: {
         tracked: true,
+        measurement: {
+          weight: {
+            value: itemWeightGrams,
+            unit: "GRAMS",
+          },
+        },
       },
     })),
   };

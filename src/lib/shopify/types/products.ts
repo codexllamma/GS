@@ -21,6 +21,18 @@ export interface ProductOptionInput {
   }[];
 }
 
+export interface InventoryItemMeasurementInput {
+  weight: {
+    value: number;
+    unit: "GRAMS" | "KILOGRAMS" | "POUNDS" | "OUNCES";
+  };
+}
+
+export interface InventoryItemInput {
+  tracked: boolean;
+  measurement?: InventoryItemMeasurementInput;
+}
+
 export interface ProductVariantSetInput {
   optionValues: {
     optionName: string;
@@ -29,9 +41,7 @@ export interface ProductVariantSetInput {
 
   price: string;
 
-  inventoryItem?: {
-    tracked: boolean;
-  };
+  inventoryItem?: InventoryItemInput;
 }
 
 export interface ProductSetInput {
@@ -67,7 +77,6 @@ export interface ShopifyVariant {
   };
 }
 
-
 export interface ShopifyProduct {
   id: string;
 
@@ -96,7 +105,6 @@ export interface InventoryQuantityInput {
   changeFromQuantity?: number | null;
 }
 
-
 export interface InventorySetQuantitiesInput {
   reason: string;
   referenceDocumentUri?: string | null;
@@ -122,4 +130,3 @@ export interface InventorySetQuantitiesResponse {
     userErrors: InventorySetQuantitiesUserError[];
   };
 }
-

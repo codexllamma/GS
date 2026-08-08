@@ -1,17 +1,25 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, Minus, X, CheckSquare, Square, ShoppingBag } from "lucide-react";
+import { Plus, Minus, X, CheckSquare, Square, ShoppingBag, ArrowRight } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckoutButton } from "@/components/checkoutButton";
+import { useRouter } from "next/router";
 
 interface CartSheetProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenSummary: () => void;
+  onSelectProduct?: (productId: string) => void;
 }
 
-export const CartSheet: React.FC<CartSheetProps> = ({ isOpen, onClose }) => {
+export const CartSheet: React.FC<CartSheetProps> = ({
+  isOpen,
+  onClose,
+  onOpenSummary,
+  onSelectProduct,
+}) => {
+  const router = useRouter();
   const {
     cart,
     updateQuantity,
@@ -35,6 +43,21 @@ export const CartSheet: React.FC<CartSheetProps> = ({ isOpen, onClose }) => {
   const subtotal = isHydrated ? getSelectedSubtotal() : 0;
   const allSelected = cart.length > 0 && cart.every((item) => item.selected);
 
+  const handleProceedToSummary = () => {
+    onClose();
+    onOpenSummary();
+  };
+
+  const handleProductClick = (productId?: string) => {
+    if (!productId) return;
+    onClose();
+    if (onSelectProduct) {
+      onSelectProduct(productId);
+    } else {
+      router.push({ query: { ...router.query, product: productId } }, undefined, { shallow: true });
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -48,7 +71,7 @@ export const CartSheet: React.FC<CartSheetProps> = ({ isOpen, onClose }) => {
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
           />
 
-          {/* Sheet Container: 78vh on mobile, Full Height Right Drawer on Desktop */}
+          {/* Sheet Container */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -56,7 +79,7 @@ export const CartSheet: React.FC<CartSheetProps> = ({ isOpen, onClose }) => {
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
             className="fixed bottom-0 left-0 right-0 h-[78vh] sm:h-full sm:max-w-md sm:left-auto sm:top-0 bg-white z-50 rounded-t-3xl sm:rounded-none flex flex-col shadow-2xl border-t border-neutral-200"
           >
-            {/* Mobile Drag Indicator / Header */}
+            {/* Header */}
             <div className="flex flex-col items-center pt-3 pb-2 px-6 border-b border-neutral-100 flex-shrink-0">
               <div className="w-12 h-1.5 bg-neutral-300 rounded-full mb-3 sm:hidden" />
               <div className="w-full flex items-center justify-between">
@@ -111,6 +134,7 @@ export const CartSheet: React.FC<CartSheetProps> = ({ isOpen, onClose }) => {
                   const image = item.image || "https://placehold.co/200x260/png?text=Product";
                   const isEditing = editItemId === item.variantId;
                   const isMaxStock = item.stock !== undefined && item.quantity >= item.stock;
+                  const targetProductId = item.productId;
 
                   return (
                     <div key={item.variantId} className="pt-4 first:pt-0 flex gap-3">
@@ -126,8 +150,11 @@ export const CartSheet: React.FC<CartSheetProps> = ({ isOpen, onClose }) => {
                         )}
                       </button>
 
-                      {/* Image Thumbnail */}
-                      <div className="w-20 h-24 bg-neutral-100 rounded-md overflow-hidden flex-shrink-0 border border-neutral-200">
+                      {/* Image Thumbnail (Clickable) */}
+                      <div
+                        onClick={() => handleProductClick(targetProductId)}
+                        className="w-20 h-24 bg-neutral-100 rounded-md overflow-hidden flex-shrink-0 border border-neutral-200 cursor-pointer hover:opacity-90 transition"
+                      >
                         <img src={image} alt={item.name} className="w-full h-full object-cover" />
                       </div>
 
@@ -135,7 +162,12 @@ export const CartSheet: React.FC<CartSheetProps> = ({ isOpen, onClose }) => {
                       <div className="flex-1 min-w-0 flex flex-col justify-between">
                         <div>
                           <div className="flex justify-between items-start gap-2">
-                            <h4 className="text-sm font-semibold text-neutral-900 truncate">{item.name}</h4>
+                            <h4
+                              onClick={() => handleProductClick(targetProductId)}
+                              className="text-sm font-semibold text-neutral-900 truncate cursor-pointer hover:underline"
+                            >
+                              {item.name}
+                            </h4>
                             <button
                               onClick={() => removeFromCart(item.variantId)}
                               className="text-neutral-400 hover:text-black p-0.5 cursor-pointer"
@@ -232,7 +264,14 @@ export const CartSheet: React.FC<CartSheetProps> = ({ isOpen, onClose }) => {
                   <span>₹{subtotal.toLocaleString()}</span>
                 </div>
 
-                <CheckoutButton items={selectedItems} />
+                <button
+                  onClick={handleProceedToSummary}
+                  disabled={selectedItems.length === 0}
+                  className="w-full py-3.5 bg-black text-white text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-neutral-800 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>Proceed to Checkout</span>
+                  <ArrowRight size={16} />
+                </button>
 
                 <p className="text-[11px] text-neutral-400 text-center">
                   Shipping & taxes calculated at checkout

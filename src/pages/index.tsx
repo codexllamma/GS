@@ -8,17 +8,26 @@ import ProductsGrid from "@/components/productGrid";
 import { CartSheet } from "@/components/cartSheet";
 import { CartStickyBar } from "@/components/cartStickyBar";
 import { ProductModal } from "@/components/productModal";
+import { CheckoutSummaryModal } from "@/components/checkoutSummaryModal";
 
 export default function Home() {
   const router = useRouter();
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
 
   // Read `?product=id` from URL query string
-  const activeProductId = typeof router.query.product === "string" ? router.query.product : null;
+  const activeProductId =
+    typeof router.query.product === "string" ? router.query.product : null;
 
   const handleCloseProductModal = () => {
     const { product, ...restQuery } = router.query;
     router.push({ query: restQuery }, undefined, { shallow: true });
+  };
+
+  const handleSelectProduct = (productId: string) => {
+    router.push({ query: { ...router.query, product: productId } }, undefined, {
+      shallow: true,
+    });
   };
 
   return (
@@ -37,8 +46,24 @@ export default function Home() {
       {/* Floating Bottom Cart CTA Bar */}
       <CartStickyBar onOpenCart={() => setIsCartOpen(true)} />
 
-      {/* 75% Mobile Height Bottom Sheet Cart */}
-      <CartSheet isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+      {/* Cart Drawer */}
+      <CartSheet
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        onOpenSummary={() => setIsSummaryOpen(true)}
+        onSelectProduct={handleSelectProduct}
+      />
+
+      {/* Checkout Summary Confirmation Drawer */}
+      <CheckoutSummaryModal
+        isOpen={isSummaryOpen}
+        onClose={() => setIsSummaryOpen(false)}
+        onBackToCart={() => {
+          setIsSummaryOpen(false);
+          setIsCartOpen(true);
+        }}
+        onSelectProduct={handleSelectProduct}
+      />
 
       {/* Product Detail Quick-View Modal */}
       <ProductModal

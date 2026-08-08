@@ -105,9 +105,10 @@ model Address {
 }
 
 model Category {
-  id      String   @id @default(cuid())
-  name    String   @unique
-  fabrics Fabric[]
+  id          String   @id @default(cuid())
+  name        String   @unique
+  weightGrams Float    @default(245.0)
+  fabrics     Fabric[]
 }
 
 model Fabric {
