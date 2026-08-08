@@ -51,6 +51,7 @@ export interface OrderCreateInput {
   shippingAddress: OrderAddressInput;
   email?: string;
   financialStatus?: string;
+  paymentGatewayNames?: string[];
   note?: string;
 }
 

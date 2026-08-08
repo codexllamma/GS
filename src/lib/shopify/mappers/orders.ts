@@ -124,6 +124,7 @@ export function mapOrderToOrderCreateInput(
         quantity: item.quantity,
         variantId: shopifyVariantId,
         requiresShipping: true,
+        paymentGatewayNames: order.isPaid ? ["Razorpay"] : ["Custom"],
         priceSet: {
           shopMoney: {
             amount: item.priceAtPurchase.toFixed(2),
