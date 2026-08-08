@@ -74,7 +74,6 @@ export function mapOrderToOrderCreateInput(
   const rawPhone = sanitizeField(order.user?.phoneNumber, "");
   const userPhone = rawPhone ? rawPhone : undefined;
 
-  // Primary address check with fallback to first saved user address
   const activeAddress = order.address || (order.user as any)?.addresses?.[0];
 
   const address1 = sanitizeField(activeAddress?.line1, "Main Street");
@@ -107,6 +106,8 @@ export function mapOrderToOrderCreateInput(
     customerId: shopifyCustomerId || undefined,
     email: userEmail,
     financialStatus: order.isPaid ? "PAID" : "PENDING",
+    // Placed at root level so Shopify sets payment gateway as Razorpay instead of COD
+    paymentGatewayNames: order.isPaid ? ["Razorpay"] : ["Manual"],
 
     shippingAddress: addressPayload,
     billingAddress: addressPayload,
@@ -124,7 +125,6 @@ export function mapOrderToOrderCreateInput(
         quantity: item.quantity,
         variantId: shopifyVariantId,
         requiresShipping: true,
-        paymentGatewayNames: order.isPaid ? ["Razorpay"] : ["Custom"],
         priceSet: {
           shopMoney: {
             amount: item.priceAtPurchase.toFixed(2),
