@@ -43,15 +43,27 @@ export interface OrderAddressInput {
   phone?: string;
 }
 
+export interface OrderTransactionInput {
+  kind: "SALE" | "AUTHORIZATION" | "CAPTURE";
+  status: "SUCCESS" | "PENDING" | "FAILURE";
+  gateway: string;
+  amountSet: {
+    shopMoney: {
+      amount: string;
+      currencyCode: string;
+    };
+  };
+}
+
 export interface OrderCreateInput {
   currency: string;
-  customerId?: string; // Allows linking directly to existing Shopify Customer IDs
+  customerId?: string;
   lineItems: OrderLineItemInput[];
   billingAddress: OrderAddressInput;
   shippingAddress: OrderAddressInput;
   email?: string;
   financialStatus?: string;
-  paymentGatewayNames?: string[];
+  transactions?: OrderTransactionInput[];
   note?: string;
 }
 

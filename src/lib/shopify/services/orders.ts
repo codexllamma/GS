@@ -43,36 +43,36 @@ mutation OrderCreate(
 export async function syncShopifyOrder(
   payload: OrderCreateInput
 ): Promise<ShopifyOrder> {
-  const response =
-    await shopify.graphql<OrderCreateResponse>(
-      ORDER_CREATE_MUTATION,
-      {
-        order: payload,
+  console.log("[SHOPIFY SYNC] Sending Order Payload:", JSON.stringify(payload, null, 2));
 
-        options: {
-          inventoryBehaviour: "BYPASS",
-          sendReceipt: false,
-          sendFulfillmentReceipt: false,
-        },
-      }
-    );
+  const response = await shopify.graphql<OrderCreateResponse>(
+    ORDER_CREATE_MUTATION,
+    {
+      order: payload,
+      options: {
+        inventoryBehaviour: "BYPASS",
+        sendReceipt: false,
+        sendFulfillmentReceipt: false,
+      },
+    }
+  );
 
   const result = response.orderCreate;
 
-  if (result.userErrors.length > 0) {
-    throw new Error(
-      result.userErrors
-        .map(({ field, message }) => {
-          const location = field?.join(".") ?? "order";
-          return `${location}: ${message}`;
-        })
-        .join("\n")
-    );
+  if (result.userErrors && result.userErrors.length > 0) {
+    const errorMessage = result.userErrors
+      .map(({ field, message }) => `${field?.join(".") || "order"}: ${message}`)
+      .join("\n");
+
+    console.error("[SHOPIFY SYNC USER ERRORS]:", errorMessage);
+    throw new Error(`Shopify Order Creation Failed:\n${errorMessage}`);
   }
 
   if (!result.order) {
+    console.error("[SHOPIFY SYNC ERROR] No order returned:", response);
     throw new Error("Shopify did not return an order.");
   }
 
+  console.log(`[SHOPIFY SYNC SUCCESS] Order Created: #${result.order.number} (${result.order.id})`);
   return result.order;
 }

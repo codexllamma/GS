@@ -101,13 +101,30 @@ export function mapOrderToOrderCreateInput(
     ...(userPhone ? { phone: userPhone } : {}),
   };
 
+  const totalAmountStr = order.total.toFixed(2);
+
   return {
     currency: CURRENCY,
     customerId: shopifyCustomerId || undefined,
     email: userEmail,
     financialStatus: order.isPaid ? "PAID" : "PENDING",
-    // Placed at root level so Shopify sets payment gateway as Razorpay instead of COD
-    paymentGatewayNames: order.isPaid ? ["Razorpay"] : ["Manual"],
+
+    // Standard Shopify GraphQL method to record paid gateway transactions
+    transactions: order.isPaid
+      ? [
+          {
+            kind: "SALE",
+            status: "SUCCESS",
+            gateway: "Razorpay",
+            amountSet: {
+              shopMoney: {
+                amount: totalAmountStr,
+                currencyCode: CURRENCY,
+              },
+            },
+          },
+        ]
+      : undefined,
 
     shippingAddress: addressPayload,
     billingAddress: addressPayload,
