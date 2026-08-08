@@ -172,7 +172,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (existingUser) {
           user = await tx.user.update({
             where: { id: existingUser.id },
-            data: {
+            update: {
               ...(fullName && fullName !== "Valued Customer" ? { name: fullName } : {}),
             },
           });
@@ -246,7 +246,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    // 5. Shopify Auto-Sync
+    // 5. Shopify Auto-Sync (Awaited with try/catch so serverless containers do not freeze execution)
     try {
       console.log(`[SHOPIFY AUTO-SYNC] Syncing Order ${createdOrder.id}`);
 
