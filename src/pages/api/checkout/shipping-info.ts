@@ -1,3 +1,5 @@
+// pages/api/checkout/shipping-info.ts
+
 import type { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -49,27 +51,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 4. Construct Razorpay Shipping Methods (Amounts in PAISE: ₹50 = 5000)
     const shippingMethods: any[] = [];
 
-    // Option 1: Prepaid (Free Shipping, COD explicitly disabled)
+    // Option 1: Prepaid (Free Shipping)
     shippingMethods.push({
       id: "prepaid_standard",
       name: "Standard Delivery (Prepaid)",
-      description: "Delivered in 2-5 business days (Free)",
+      description: "Delivered in 2-5 business days",
       serviceable: isServiceable,
-      shipping_fee: 0,
+      shipping_fee: 0, // Displays "FREE" badge
       cod: false,
       cod_fee: 0,
     });
 
-    // Option 2: Cash on Delivery (Only if pincode supports COD, charges ₹50)
+    // Option 2: Cash on Delivery (₹50 COD Fee)
     if (isCodAvailable) {
       shippingMethods.push({
         id: "cod_standard",
         name: "Cash on Delivery",
-        description: "Pay cash upon delivery (+ ₹50 COD Fee)",
+        description: "Pay cash upon delivery",
         serviceable: isServiceable && isCodAvailable,
-        shipping_fee: 0,
+        shipping_fee: 5000, // 5000 paise = ₹50 (Displays "₹50" badge)
         cod: true,
-        cod_fee: 5000, // 5000 paise = ₹50
+        cod_fee: 0,
       });
     }
 
@@ -107,11 +109,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             {
               id: "cod_fallback",
               name: "Cash on Delivery",
-              description: "Pay cash upon delivery (+ ₹50 COD Fee)",
+              description: "Pay cash upon delivery",
               serviceable: true,
-              shipping_fee: 0,
+              shipping_fee: 5000, // ₹50
               cod: true,
-              cod_fee: 5000,
+              cod_fee: 0,
             },
           ],
         },
