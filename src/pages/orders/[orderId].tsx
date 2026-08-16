@@ -99,7 +99,6 @@ export default function OrderDetailPage() {
     fetchOrder();
   }, [orderId]);
 
-  // 72-Hour Return Window Eligibility Check
   const isReturnEligible = () => {
     if (!order) return false;
     const baseDate = order.deliveredAt ? new Date(order.deliveredAt) : new Date(order.createdAt);
@@ -112,40 +111,39 @@ export default function OrderDetailPage() {
     switch (normalized) {
       case "DELIVERED":
         return (
-          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-brand-olive/10 text-brand-olive border border-brand-olive/20 rounded-xs">
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-1 bg-brand-olive/10 text-brand-olive border border-brand-olive/20 rounded-xs">
             Delivered
           </span>
         );
       case "SHIPPED":
       case "IN_TRANSIT":
         return (
-          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-brand-charcoal text-white rounded-xs">
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-1 bg-brand-charcoal text-white rounded-xs">
             In Transit
           </span>
         );
       case "RETURN_REQUESTED":
       case "RETURN_IN_PROGRESS":
         return (
-          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-xs">
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-xs">
             Return in Progress
           </span>
         );
       case "CANCELLED":
         return (
-          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-xs">
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded-xs">
             Cancelled
           </span>
         );
       default:
         return (
-          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-brand-card text-brand-charcoal border border-brand-border rounded-xs">
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-1 bg-brand-card text-brand-charcoal border border-brand-border rounded-xs">
             {status || "Confirmed"}
           </span>
         );
     }
   };
 
-  // 1. LOADING STATE
   if (loading) {
     return (
       <div className="min-h-screen bg-brand-bg flex items-center justify-center font-sans">
@@ -159,10 +157,9 @@ export default function OrderDetailPage() {
     );
   }
 
-  // 2. ERROR / NOT FOUND STATE
   if (!order) {
     return (
-      <div className="min-h-screen bg-brand-bg text-brand-charcoal font-sans flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-brand-bg text-brand-charcoal font-sans flex flex-col items-center justify-center px-4 py-8">
         <div className="bg-white border border-brand-border rounded-sm p-6 sm:p-10 text-center max-w-sm w-full shadow-xs">
           <Package size={26} className="text-brand-caption stroke-[1.5] mx-auto mb-2.5" />
           <h1 className="font-serif text-lg font-medium text-brand-charcoal">Order Record Unavailable</h1>
@@ -192,24 +189,21 @@ export default function OrderDetailPage() {
           `Return Request for Order #${order.id.slice(-8).toUpperCase()}`
         )}`);
 
-  // 3. MAIN ORDER SUMMARY UI
   return (
-    <div className="min-h-screen bg-brand-bg text-brand-charcoal font-sans selection:bg-brand-olive selection:text-white py-6 sm:py-10 px-4 sm:px-6 md:px-8">
-      <main className="max-w-4xl w-full mx-auto space-y-4 sm:space-y-5">
+    <div className="min-h-screen bg-brand-bg text-brand-charcoal font-sans selection:bg-brand-olive selection:text-white py-4 sm:py-8 px-3.5 sm:px-6 md:px-8">
+      <main className="max-w-4xl w-full mx-auto space-y-3.5 sm:space-y-5">
         
         {/* Top Breadcrumb Navigation */}
-        <div className="flex items-center justify-between pb-1">
+        <div className="flex items-center justify-between pt-1">
           <Link
             href="/orders/orders-page"
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-textSec hover:text-brand-charcoal transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-textSec hover:text-brand-charcoal transition-colors cursor-pointer group"
           >
             <ArrowLeft size={13} className="transition-transform duration-200 group-hover:-translate-x-1" />
             <span>Back to Orders</span>
           </Link>
 
-          <div className="flex items-center gap-2">
-            {getStatusBadge(order.status)}
-          </div>
+          <div>{getStatusBadge(order.status)}</div>
         </div>
 
         {/* Order Header Summary Card */}
@@ -217,45 +211,44 @@ export default function OrderDetailPage() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.22 }}
-          className="bg-white border border-brand-border rounded-sm p-4.5 sm:p-6 shadow-xs"
+          className="bg-white border border-brand-border rounded-sm p-4 sm:p-6 shadow-xs"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 sm:pb-5 border-b border-brand-border gap-3.5">
             <div>
               <span className="text-[9px] font-bold tracking-[0.25em] text-brand-charcoal uppercase block mb-0.5">
                 ORDER RECEIPT
               </span>
-              <h1 className="font-serif text-xl sm:text-2xl font-normal text-brand-charcoal tracking-wide">
+              <h1 className="font-serif text-lg sm:text-2xl font-normal text-brand-charcoal tracking-wide">
                 #{order.id.slice(-8).toUpperCase()}
               </h1>
             </div>
 
-            <div className="flex flex-wrap gap-2 sm:justify-end">
-              {/* Live Shiprocket Tracking */}
+            {/* Mobile-Friendly CTAs */}
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
               {shiprocketTrackingUrl ? (
                 <a
                   href={shiprocketTrackingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-10 px-4 bg-white border border-brand-border hover:border-brand-charcoal text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center gap-1.5 shadow-xs active:scale-[0.99] cursor-pointer"
+                  className="w-full sm:w-auto h-9 px-3.5 bg-white border border-brand-border hover:border-brand-charcoal text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99] cursor-pointer"
                 >
                   <Truck size={13} className="stroke-[1.6]" />
-                  <span>Track on Shiprocket</span>
+                  <span>Track Shipment</span>
                   <ExternalLink size={11} className="text-brand-textSec" />
                 </a>
               ) : (
-                <div className="h-10 px-4 bg-brand-stone/20 text-brand-textSec text-[10px] font-semibold uppercase tracking-widest rounded-sm flex items-center gap-1.5 select-none">
+                <div className="w-full sm:w-auto h-9 px-3 bg-brand-stone/20 text-brand-textSec text-[10px] font-semibold uppercase tracking-widest rounded-sm flex items-center justify-center gap-1.5 select-none">
                   <Clock size={12} />
                   <span>Awaiting Pickup</span>
                 </div>
               )}
 
-              {/* 72HR Return Action Button */}
               {isReturnEligible() ? (
                 <a
                   href={shiprocketReturnUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-10 px-4 bg-brand-card hover:bg-brand-stone/40 border border-brand-border text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center gap-1.5 shadow-xs active:scale-[0.99] cursor-pointer"
+                  className="w-full sm:w-auto h-9 px-3.5 bg-brand-card hover:bg-brand-stone/40 border border-brand-border text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99] cursor-pointer"
                 >
                   <RotateCcw size={12} className="stroke-[1.6]" />
                   <span>Request Return</span>
@@ -263,7 +256,7 @@ export default function OrderDetailPage() {
               ) : (
                 <div
                   title="Returns are eligible within 72 hours of delivery"
-                  className="h-10 px-3.5 bg-brand-card/40 border border-dashed border-brand-border text-brand-textSec text-[10px] font-semibold uppercase tracking-wider rounded-sm flex items-center gap-1 select-none"
+                  className="w-full sm:w-auto h-9 px-3 bg-brand-card/40 border border-dashed border-brand-border text-brand-textSec text-[10px] font-semibold uppercase tracking-wider rounded-sm flex items-center justify-center gap-1 select-none"
                 >
                   <ShieldCheck size={12} className="text-brand-olive" />
                   <span>72hr Window</span>
@@ -273,14 +266,14 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Meta Information Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-4 sm:pt-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-3.5 sm:pt-4">
             <div>
               <span className="text-[9px] uppercase tracking-widest text-brand-textSec font-semibold block">
                 Booking Date
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <Calendar size={12} className="text-brand-textSec flex-shrink-0" />
-                <span className="text-xs font-medium text-brand-charcoal">
+                <span className="text-[11px] sm:text-xs font-medium text-brand-charcoal">
                   {new Date(order.createdAt).toLocaleDateString("en-IN", {
                     day: "numeric",
                     month: "short",
@@ -296,7 +289,7 @@ export default function OrderDetailPage() {
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <CreditCard size={12} className="text-brand-textSec flex-shrink-0" />
-                <span className="text-xs font-medium text-brand-charcoal capitalize">
+                <span className="text-[11px] sm:text-xs font-medium text-brand-charcoal capitalize">
                   {order.paymentMethod || "Prepaid"}
                 </span>
               </div>
@@ -306,7 +299,7 @@ export default function OrderDetailPage() {
               <span className="text-[9px] uppercase tracking-widest text-brand-textSec font-semibold block">
                 Logistics Partner
               </span>
-              <span className="text-xs font-medium text-brand-charcoal mt-0.5 block truncate">
+              <span className="text-[11px] sm:text-xs font-medium text-brand-charcoal mt-0.5 block truncate">
                 {order.courierName || "Shiprocket Express"}
               </span>
             </div>
@@ -315,7 +308,7 @@ export default function OrderDetailPage() {
               <span className="text-[9px] uppercase tracking-widest text-brand-textSec font-semibold block">
                 AWB Consignment
               </span>
-              <span className="text-xs font-medium text-brand-charcoal mt-0.5 block truncate">
+              <span className="text-[11px] sm:text-xs font-medium text-brand-charcoal mt-0.5 block truncate">
                 {order.awbCode || "Generating..."}
               </span>
             </div>
@@ -323,8 +316,8 @@ export default function OrderDetailPage() {
         </motion.div>
 
         {/* Ordered Items Breakdown */}
-        <div className="bg-white border border-brand-border rounded-sm p-4.5 sm:p-6 shadow-xs">
-          <h2 className="text-[11px] font-bold tracking-[0.2em] text-brand-charcoal uppercase mb-3.5">
+        <div className="bg-white border border-brand-border rounded-sm p-4 sm:p-6 shadow-xs">
+          <h2 className="text-[10px] sm:text-[11px] font-bold tracking-[0.2em] text-brand-charcoal uppercase mb-3">
             Purchased Essentials
           </h2>
 
@@ -341,8 +334,8 @@ export default function OrderDetailPage() {
               const unitPrice = item.priceAtPurchase || item.price || 0;
 
               return (
-                <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-center gap-3.5 sm:gap-4">
-                  {/* Garment Image */}
+                <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-start sm:items-center gap-3 sm:gap-4">
+                  {/* Thumbnail */}
                   <div className="w-14 sm:w-16 h-18 sm:h-20 bg-brand-stone/30 rounded-sm overflow-hidden flex-shrink-0 border border-brand-border">
                     <img
                       src={image}
@@ -351,17 +344,17 @@ export default function OrderDetailPage() {
                     />
                   </div>
 
-                  {/* Garment Specifications */}
-                  <div className="flex-1 min-w-0">
+                  {/* Specifications */}
+                  <div className="flex-1 min-w-0 pr-1">
                     <h3 className="font-serif text-xs sm:text-sm font-medium text-brand-charcoal tracking-wide truncate">
                       {product?.name || "Signature Garment"}
                     </h3>
-                    <p className="text-[11px] text-brand-textSec mt-0.5">
+                    <p className="text-[10px] sm:text-[11px] text-brand-textSec mt-0.5 truncate">
                       {fabricName ? `${fabricName} · ` : ""}
                       {product?.color || "Standard"}
                     </p>
 
-                    <div className="flex items-center gap-2.5 mt-1 text-[10px] sm:text-[11px] font-medium text-brand-charcoal">
+                    <div className="flex items-center gap-2 mt-1 text-[10px] sm:text-[11px] font-medium text-brand-charcoal">
                       <span>Size: {item.variant?.size || "Standard"}</span>
                       <span className="text-brand-border">|</span>
                       <span>Qty: {item.quantity}</span>
@@ -369,13 +362,13 @@ export default function OrderDetailPage() {
                   </div>
 
                   {/* Price */}
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <span className="text-xs sm:text-sm font-semibold text-brand-charcoal">
                       ₹{(unitPrice * item.quantity).toLocaleString("en-IN")}
                     </span>
                     {item.quantity > 1 && (
-                      <span className="text-[10px] text-brand-textSec block mt-0.5">
-                        ₹{unitPrice.toLocaleString("en-IN")} each
+                      <span className="text-[9px] sm:text-[10px] text-brand-textSec block mt-0.5">
+                        ₹{unitPrice.toLocaleString("en-IN")} ea
                       </span>
                     )}
                   </div>
@@ -386,13 +379,13 @@ export default function OrderDetailPage() {
         </div>
 
         {/* Delivery Address & Financial Settlement Grid */}
-        <div className="grid sm:grid-cols-2 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
           {/* Shipping Address Card */}
-          <div className="bg-white border border-brand-border rounded-sm p-4.5 sm:p-5 shadow-xs flex flex-col justify-between">
+          <div className="bg-white border border-brand-border rounded-sm p-4 sm:p-5 shadow-xs flex flex-col justify-between">
             <div>
-              <div className="flex items-center gap-1.5 mb-2.5">
-                <MapPin size={14} className="text-brand-textSec stroke-[1.6]" />
-                <h3 className="text-[10px] font-bold tracking-[0.2em] text-brand-charcoal uppercase">
+              <div className="flex items-center gap-1.5 mb-2">
+                <MapPin size={13} className="text-brand-textSec stroke-[1.6]" />
+                <h3 className="text-[9px] sm:text-[10px] font-bold tracking-[0.2em] text-brand-charcoal uppercase">
                   Delivery Destination
                 </h3>
               </div>
@@ -411,15 +404,15 @@ export default function OrderDetailPage() {
               )}
             </div>
 
-            <div className="pt-3 mt-3 border-t border-brand-border/60 flex items-center gap-1.5 text-[10px] sm:text-[11px] text-brand-textSec">
+            <div className="pt-2.5 mt-3 border-t border-brand-border/60 flex items-center gap-1.5 text-[10px] sm:text-[11px] text-brand-textSec">
               <ShieldCheck size={13} className="text-brand-olive flex-shrink-0" />
               <span>Complimentary insured shipping</span>
             </div>
           </div>
 
           {/* Pricing Ledger */}
-          <div className="bg-white border border-brand-border rounded-sm p-4.5 sm:p-5 shadow-xs space-y-2.5">
-            <h3 className="text-[10px] font-bold tracking-[0.2em] text-brand-charcoal uppercase mb-2.5">
+          <div className="bg-white border border-brand-border rounded-sm p-4 sm:p-5 shadow-xs space-y-2">
+            <h3 className="text-[9px] sm:text-[10px] font-bold tracking-[0.2em] text-brand-charcoal uppercase mb-2">
               Settlement Summary
             </h3>
 
@@ -432,7 +425,7 @@ export default function OrderDetailPage() {
 
             <div className="flex justify-between text-xs text-brand-textSec font-light">
               <span>Shipping & Logistics</span>
-              <span className="text-brand-olive font-medium uppercase text-[10px] tracking-wider">
+              <span className="text-brand-olive font-medium uppercase text-[9px] sm:text-[10px] tracking-wider">
                 Complimentary
               </span>
             </div>
@@ -442,7 +435,7 @@ export default function OrderDetailPage() {
               <span className="text-brand-charcoal font-medium">Included</span>
             </div>
 
-            <div className="pt-2.5 border-t border-brand-border flex justify-between items-baseline">
+            <div className="pt-2 border-t border-brand-border flex justify-between items-baseline">
               <span className="text-xs font-semibold uppercase tracking-wider text-brand-charcoal">
                 Total Paid
               </span>
@@ -453,13 +446,13 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
-        {/* Concierge Assistance Footer with Fixed Action Button */}
-        <div className="p-4 sm:p-5 bg-brand-card/40 border border-brand-border rounded-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-          <div className="flex items-center gap-3">
-            <HelpCircle size={17} className="text-brand-textSec flex-shrink-0 hidden sm:block stroke-[1.6]" />
+        {/* Concierge Assistance Footer */}
+        <div className="p-4 bg-brand-card/40 border border-brand-border rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <HelpCircle size={16} className="text-brand-textSec flex-shrink-0 mt-0.5 sm:mt-0 stroke-[1.6]" />
             <div>
               <p className="text-xs font-medium text-brand-charcoal">Require Assistance with this Order?</p>
-              <p className="text-[11px] text-brand-textSec mt-0.5 font-light">
+              <p className="text-[10px] sm:text-[11px] text-brand-textSec mt-0.5 font-light">
                 Our concierge team is available to assist with alterations, fit advice, and exchanges.
               </p>
             </div>
@@ -471,9 +464,9 @@ export default function OrderDetailPage() {
             )}&body=${encodeURIComponent(
               `Hi HIÈR Concierge,\n\nI need assistance with my Order #${order.id}.\n\nQuery Details:\n`
             )}`}
-            className="w-full sm:w-auto h-10 px-5 bg-white border border-brand-border hover:border-brand-charcoal text-brand-charcoal text-[10px] sm:text-[11px] font-semibold uppercase tracking-widest rounded-sm transition-all shadow-xs active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer flex-shrink-0"
+            className="w-full sm:w-auto h-9 px-4 bg-white border border-brand-border hover:border-brand-charcoal text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition-all shadow-xs active:scale-[0.99] flex items-center justify-center gap-1.5 cursor-pointer flex-shrink-0"
           >
-            <Mail size={13} className="stroke-[1.6]" />
+            <Mail size={12} />
             <span>Contact Concierge</span>
           </a>
         </div>
