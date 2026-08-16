@@ -183,9 +183,9 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
     <button
       onClick={handleCheckout}
       disabled={loading || items.length === 0}
-      className="w-full bg-black text-white font-medium py-3 sm:py-3.5 rounded-md hover:bg-neutral-800 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all cursor-pointer"
+      className="w-full bg-brand-btn text-white text-[11px] font-semibold uppercase tracking-widest py-3.5 rounded-sm hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
     >
-      {loading ? "Opening Checkout..." : "Proceed to Checkout"}
+      {loading ? "Opening Razorpay..." : "Proceed to Payment"}
     </button>
   );
 };

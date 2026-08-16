@@ -1,15 +1,32 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useSession, signOut } from "next-auth/react";
-import { Search, Menu, X, User, Package, LogOut, LogIn, ChevronRight } from "lucide-react";
+import {
+  Search,
+  Menu,
+  X,
+  User,
+  Package,
+  LogOut,
+  LogIn,
+  ChevronRight,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 import AnimatedLogo from "./animatedLogo";
 import { AuthModal } from "./authModal";
 
-const Header: React.FC = () => {
+const CATEGORIES = [
+  { label: "ALL", value: "" },
+  { label: "SHIRTS", value: "shirts" },
+  { label: "POLOS", value: "polos" },
+  { label: "TROUSERS", value: "trousers" },
+];
+
+export const Header: React.FC = () => {
   const router = useRouter();
   const { data: session, status } = useSession();
   const isLoggedIn = status === "authenticated";
@@ -18,30 +35,52 @@ const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Search State
+  // Search Expand State
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
 
-  useEffect(() => {
-    if (searchOpen && categories.length === 0) {
-      fetch("/api/categories")
-        .then((res) => res.json())
-        .then((data) => setCategories(data))
-        .catch((err) => console.error(err));
-    }
-  }, [searchOpen, categories.length]);
+  const scrollToProducts = () => {
+    const el =
+      document.getElementById("shop-collection") ||
+      document.getElementById("catalog") ||
+      document.getElementById("products-grid");
 
-  const handleSearch = () => {
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const handleSearch = async () => {
     setSearchOpen(false);
-    router.push({
-      pathname: "/product/products",
-      query: {
-        ...(searchTerm && { search: searchTerm }),
-        ...(selectedCategory && { category: selectedCategory }),
+
+    const nextQuery: Record<string, any> = { ...router.query };
+    if (searchTerm.trim()) {
+      nextQuery.search = searchTerm.trim();
+    } else {
+      delete nextQuery.search;
+    }
+
+    if (selectedCategory) {
+      nextQuery.category = selectedCategory;
+    } else {
+      delete nextQuery.category;
+    }
+
+    const isHome = router.pathname === "/";
+
+    await router.push(
+      {
+        pathname: isHome ? router.pathname : "/",
+        query: nextQuery,
       },
-    });
+      undefined,
+      { shallow: isHome }
+    );
+
+    setTimeout(() => {
+      scrollToProducts();
+    }, 150);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -51,127 +90,153 @@ const Header: React.FC = () => {
     }
   };
 
+  const handleProtectedNav = (path: string) => {
+    setIsMenuOpen(false);
+    if (!isLoggedIn) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("redirectIntent", path);
+      }
+      toast.error("Please sign in or register first");
+      setIsAuthModalOpen(true);
+      return;
+    }
+    router.push(path);
+  };
+
+  const isNavbarActive = searchOpen || isMenuOpen;
+
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-neutral-200 font-apercu">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center justify-between h-14 md:h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center">
-            <AnimatedLogo />
-          </Link>
-
-          {/* Desktop Search Trigger */}
-          <div className="hidden md:flex flex-1 justify-center">
-            {!searchOpen && (
-              <motion.button
-                onClick={() => setSearchOpen(true)}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center w-72 lg:w-[30rem] h-11 rounded-full bg-neutral-100 px-8 text-base text-neutral-500 hover:text-black transition cursor-pointer"
-              >
-                <Search size={18} className="mr-2" />
-                Search products...
-              </motion.button>
-            )}
-          </div>
-
-          {/* Right Action Icons */}
-          <div className="flex items-center gap-2">
-            <motion.button
-              onClick={() => setSearchOpen(true)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="md:hidden p-2 text-neutral-500 hover:text-black transition cursor-pointer"
-              aria-label="Search"
-            >
-              <Search size={20} />
-            </motion.button>
-
-            <motion.button
-              onClick={() => setIsMenuOpen(true)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="p-2 text-neutral-800 hover:text-black transition focus:outline-none cursor-pointer"
-              aria-label="Open Navigation Menu"
-            >
-              <Menu size={24} />
-            </motion.button>
-          </div>
-        </div>
+    <>
+      {/* ---------------- 1. TOP ANNOUNCEMENT BANNER ---------------- */}
+      <div className="relative z-50 w-full bg-brand-charcoal text-brand-bg text-[9px] xs:text-[10px] sm:text-[11px] tracking-widest uppercase py-1.5 px-4 text-center font-medium truncate select-none">
+        Complimentary shipping on all prepaid orders.
       </div>
 
-      {/* SEARCH OVERLAY */}
-      <AnimatePresence>
-        {searchOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute left-0 right-0 top-14 md:top-16 bg-white border-b border-neutral-200 shadow-md p-4 z-40"
-          >
-            <div className="max-w-3xl mx-auto flex flex-col gap-4">
-              <div className="flex items-center gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-2.5 text-neutral-400" size={18} />
-                  <input
-                    autoFocus
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Search for polos, shirts..."
-                    className="w-full h-10 bg-neutral-100 rounded-lg pl-10 pr-3 outline-none text-sm"
-                  />
-                </div>
-                <button
-                  onClick={() => setSearchOpen(false)}
-                  className="p-2 bg-neutral-100 rounded-full hover:bg-neutral-200 transition cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* FILTER BUTTONS */}
-              <div className="flex flex-wrap items-center gap-3 text-sm">
-                <span className="text-neutral-400 mr-2">Filter by:</span>
-                <button
-                  onClick={() => setSelectedCategory("")}
-                  className={`px-3 py-1 rounded-full border transition cursor-pointer ${
-                    selectedCategory === ""
-                      ? "bg-black text-white border-black"
-                      : "bg-white text-neutral-600 border-neutral-200 hover:border-black"
-                  }`}
-                >
-                  All
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.name)}
-                    className={`px-3 py-1 rounded-full border transition cursor-pointer ${
-                      selectedCategory === cat.name
-                        ? "bg-black text-white border-black"
-                        : "bg-white text-neutral-600 border-neutral-200 hover:border-black"
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSearch}
-                  className="bg-black text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition cursor-pointer"
-                >
-                  Show Results
-                </button>
-              </div>
+      {/* ---------------- 2. STICKY TRANSPARENT NAVBAR ---------------- */}
+      <header
+        className={`sticky top-0 z-40 w-full select-none transition-colors duration-300 ${
+          isNavbarActive
+            ? "bg-white border-b border-brand-border shadow-sm"
+            : "bg-transparent border-b border-transparent"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 md:px-12 pt-2 sm:pt-0 pb-1.5 sm:pb-2">
+          <div className="relative flex items-center justify-between h-13 sm:h-16">
+            {/* Left: Brand Logo */}
+            <div className="flex items-center flex-shrink-0 z-10 pl-1 sm:pl-2">
+              <Link href="/" className="flex items-center">
+                <AnimatedLogo />
+              </Link>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* HAMBURGER SIDEBAR OVERLAY */}
+            {/* Center-Right: Elongated Search Bar */}
+            <div className="absolute top-1/2 left-[54%] sm:left-[53%] -translate-x-1/2 -translate-y-1/2 translate-y-[calc(-50%+4px)] w-[44%] xs:w-[48%] sm:w-[320px] md:w-[420px] lg:w-[500px]">
+              <button
+                onClick={() => setSearchOpen((prev) => !prev)}
+                className={`w-full h-8 sm:h-9 px-3 sm:px-4 border rounded-full flex items-center text-xs transition-all shadow-xs cursor-pointer group ${
+                  searchOpen
+                    ? "bg-white border-brand-charcoal text-brand-charcoal"
+                    : "bg-brand-card/90 hover:bg-white border-brand-border hover:border-brand-charcoal/50 text-brand-textSec"
+                }`}
+                aria-label="Search"
+              >
+                <div className="flex items-center gap-2 w-full truncate">
+                  <Search
+                    size={14}
+                    className="text-brand-textSec group-hover:text-brand-charcoal transition-colors stroke-[1.8] flex-shrink-0"
+                  />
+                  <span className="truncate text-[10px] sm:text-xs text-left">
+                    {searchTerm
+                      ? searchTerm
+                      : "Search for shirts, polos, trousers..."}
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            {/* Right: Hamburger Menu */}
+            <div className="relative flex items-center flex-shrink-0 z-10 translate-x-[0px] translate-y-[4px] sm:translate-x-[0px] sm:translate-y-[0px]">
+              <button
+                onClick={() => setIsMenuOpen(true)}
+                className="p-1.5 sm:p-2 text-brand-charcoal hover:text-brand-olive transition-colors cursor-pointer rounded-full active:bg-brand-stone/30"
+                aria-label="Open navigation menu"
+              >
+                <Menu size={20} className="h-[30px] w-[25px] sm:w-[22px] sm:h-[22px] stroke-[2.4]" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ---------------- 3. INLINE EXPANDABLE SEARCH PANEL ---------------- */}
+        <AnimatePresence>
+          {searchOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.24, ease: "easeInOut" }}
+              className="overflow-hidden bg-white border-t border-brand-border shadow-lg"
+            >
+              <div className="max-w-2xl mx-auto p-3.5 sm:p-5 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search
+                      className="absolute left-3 top-2.5 sm:top-3 text-brand-textSec"
+                      size={15}
+                    />
+                    <input
+                      autoFocus
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type to search..."
+                      className="w-full h-9 sm:h-10 bg-brand-bg border border-brand-border rounded-sm pl-8 sm:pl-9 pr-3 outline-none text-xs sm:text-sm text-brand-charcoal placeholder:text-brand-textSec/70 focus:border-brand-charcoal transition-colors shadow-xs"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setSearchOpen(false)}
+                    className="p-1.5 sm:p-2 text-brand-textSec hover:text-brand-charcoal hover:bg-brand-stone/30 rounded-full transition cursor-pointer"
+                    aria-label="Close search"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Category Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <span className="text-brand-textSec font-medium tracking-wide uppercase text-[9px] sm:text-[10px] mr-1 flex-shrink-0">
+                    Filter:
+                  </span>
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.label}
+                      onClick={() => setSelectedCategory(cat.value)}
+                      className={`px-2.5 sm:px-3 py-1 rounded-sm border text-[9px] sm:text-[10px] font-semibold tracking-wider uppercase transition cursor-pointer flex-shrink-0 ${
+                        selectedCategory === cat.value
+                          ? "bg-brand-btn text-white border-brand-btn shadow-xs"
+                          : "bg-brand-card text-brand-charcoal border-brand-border hover:border-brand-charcoal"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex justify-end pt-0.5">
+                  <button
+                    onClick={handleSearch}
+                    className="w-full sm:w-auto bg-brand-btn text-white px-5 py-2 rounded-sm text-[10px] sm:text-[11px] font-semibold uppercase tracking-widest hover:opacity-90 active:scale-[0.99] transition shadow-xs cursor-pointer text-center"
+                  >
+                    Show Results
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      {/* ---------------- 4. RIGHT-SIDE NAVIGATION DRAWER ---------------- */}
       <AnimatePresence>
         {isMenuOpen && (
           <>
@@ -180,95 +245,71 @@ const Header: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMenuOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 transition-opacity"
             />
 
             <motion.aside
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 280 }}
-              className="fixed top-0 right-0 bottom-0 w-[72vw] max-w-xs sm:max-w-sm bg-white z-50 shadow-2xl flex flex-col justify-between border-l border-neutral-200"
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="fixed top-0 right-0 bottom-0 w-[85vw] max-w-[320px] sm:max-w-sm h-[100dvh] bg-brand-bg z-50 shadow-2xl flex flex-col border-l border-brand-border overflow-y-auto"
             >
-              <div>
-                <div className="p-4 sm:p-5 flex items-center justify-between border-b border-neutral-100">
-                  <span className="text-xs font-bold uppercase tracking-widest text-neutral-400">
-                    Menu
-                  </span>
-                  <button
-                    onClick={() => setIsMenuOpen(false)}
-                    className="p-1.5 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-full transition cursor-pointer"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {/* User Profile Banner */}
-                <div className="p-4 sm:p-5 bg-neutral-50 border-b border-neutral-100 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-700 font-bold overflow-hidden flex-shrink-0">
-                    {session?.user?.image ? (
-                      <img src={session.user.image} alt="User" className="w-full h-full object-cover" />
-                    ) : (
-                      <User size={20} />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-neutral-900 truncate">
-                      {isLoggedIn ? session?.user?.name || "Valued Customer" : "Welcome Guest"}
-                    </p>
-                    <p className="text-xs text-neutral-500 truncate">
-                      {isLoggedIn ? session?.user?.email || (session?.user as any)?.phoneNumber || "" : "Sign in to manage orders"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Navigation Links */}
-                <nav className="p-3 space-y-1">
-                  <Link
-                    href="/"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center justify-between px-4 py-3 text-sm font-medium text-neutral-800 hover:bg-neutral-100 rounded-lg transition"
-                  >
-                    <span>Home & Catalog</span>
-                    <ChevronRight size={16} className="text-neutral-400" />
-                  </Link>
-
-                  <Link
-                    href="/orders/orders-page"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-neutral-800 hover:bg-neutral-100 rounded-lg transition"
-                  >
-                    <Package size={18} className="text-neutral-500" />
-                    <span className="flex-1">Your Orders</span>
-                    <ChevronRight size={16} className="text-neutral-400" />
-                  </Link>
-
-                  {isLoggedIn && (
-                    <Link
-                      href="/profile"
-                      onClick={() => setIsMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-neutral-800 hover:bg-neutral-100 rounded-lg transition"
-                    >
-                      <User size={18} className="text-neutral-500" />
-                      <span className="flex-1">Profile Settings</span>
-                      <ChevronRight size={16} className="text-neutral-400" />
-                    </Link>
-                  )}
-                </nav>
+              {/* Header */}
+              <div className="p-4 sm:p-5 flex items-center justify-between border-b border-brand-border bg-brand-bg flex-shrink-0">
+                <span className="font-serif text-xs font-medium uppercase tracking-[0.2em] text-brand-charcoal">
+                  Account & Menu
+                </span>
+                <button
+                  onClick={() => setIsMenuOpen(false)}
+                  className="p-1.5 text-brand-textSec hover:text-brand-charcoal hover:bg-brand-stone/30 rounded-full transition cursor-pointer"
+                  aria-label="Close menu"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
-              {/* Drawer Bottom Action */}
-              <div className="p-4 border-t border-neutral-100 bg-neutral-50">
+              {/* Profile Card */}
+              <div className="p-3.5 sm:p-5 bg-brand-card border-b border-brand-border flex items-center gap-3 flex-shrink-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-brand-stone/30 border border-brand-border flex items-center justify-center text-brand-charcoal font-bold overflow-hidden flex-shrink-0">
+                  {session?.user?.image ? (
+                    <img
+                      src={session.user.image}
+                      alt="User"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User size={17} className="text-brand-charcoal stroke-[1.6]" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-serif text-xs sm:text-sm font-medium text-brand-charcoal tracking-wide truncate">
+                    {isLoggedIn
+                      ? session?.user?.name || "Valued Client"
+                      : "Welcome"}
+                  </p>
+                  <p className="text-[10px] sm:text-[11px] text-brand-textSec truncate">
+                    {isLoggedIn
+                      ? session?.user?.email ||
+                        (session?.user as any)?.phoneNumber ||
+                        ""
+                      : "Sign in to access your account"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Sign In / Log Out Button */}
+              <div className="p-3 sm:p-4 border-b border-brand-border bg-brand-bg flex-shrink-0">
                 {isLoggedIn ? (
                   <button
                     onClick={() => {
                       setIsMenuOpen(false);
                       signOut();
                     }}
-                    className="w-full py-3 px-4 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold uppercase tracking-wider rounded-lg transition flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2.5 px-4 bg-red-50/80 border border-red-200 text-red-700 hover:bg-red-100 text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <LogOut size={16} />
-                    Logout
+                    <LogOut size={14} />
+                    <span>Logout</span>
                   </button>
                 ) : (
                   <button
@@ -276,24 +317,51 @@ const Header: React.FC = () => {
                       setIsMenuOpen(false);
                       setIsAuthModalOpen(true);
                     }}
-                    className="w-full py-3 px-4 bg-black text-white hover:bg-neutral-800 text-xs font-bold uppercase tracking-wider rounded-lg transition flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2.5 px-4 bg-brand-btn text-white hover:opacity-90 text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
                   >
-                    <LogIn size={16} />
-                    Sign In / Register
+                    <LogIn size={14} />
+                    <span>Sign In / Register</span>
                   </button>
                 )}
               </div>
+
+              {/* Account Links */}
+              <div className="px-4 pt-3.5 pb-1.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] text-brand-textSec">
+                Account
+              </div>
+
+              <nav className="p-2 space-y-1 flex-1">
+                <button
+                  type="button"
+                  onClick={() => handleProtectedNav("/orders/orders-page")}
+                  className="w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium tracking-wider uppercase text-brand-charcoal hover:bg-brand-card rounded-sm transition-colors cursor-pointer text-left"
+                >
+                  <Package size={15} className="text-brand-textSec stroke-[1.6]" />
+                  <span className="flex-1 font-serif">Your Orders</span>
+                  <ChevronRight size={14} className="text-brand-textSec" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleProtectedNav("/profile")}
+                  className="w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium tracking-wider uppercase text-brand-charcoal hover:bg-brand-card rounded-sm transition-colors cursor-pointer text-left"
+                >
+                  <User size={15} className="text-brand-textSec stroke-[1.6]" />
+                  <span className="flex-1 font-serif">Profile Settings</span>
+                  <ChevronRight size={14} className="text-brand-textSec" />
+                </button>
+              </nav>
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      {/* AUTHENTICATION MODAL */}
+      {/* ---------------- 5. AUTHENTICATION MODAL ---------------- */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
       />
-    </header>
+    </>
   );
 };
 

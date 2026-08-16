@@ -120,20 +120,21 @@ model Fabric {
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  sortOrder   Int      @default(0)
-  name        String
-  description String
-  fabricId    String
-  color       String
-  basePrice   Int
-  isDeleted   Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  sortOrder    Int      @default(0)
+  name         String
+  description  String
+  fabricId     String
+  color        String
+  basePrice    Int
+  isBestseller Boolean  @default(false)
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
-  fabric     Fabric           @relation(fields: [fabricId], references: [id])
-  variants   ProductVariant[]
-  images     ProductImage[]
-  orderItems OrderItem[]
+  fabric       Fabric           @relation(fields: [fabricId], references: [id])
+  variants     ProductVariant[]
+  images       ProductImage[]
+  orderItems   OrderItem[]
 
   shopifyMapping ShopifyProductMapping?
 

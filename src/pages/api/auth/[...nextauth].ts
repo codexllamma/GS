@@ -116,7 +116,7 @@ export const authOptions: NextAuthOptions = {
     signOut: "/",
     error: "/auth/error",
     verifyRequest: "/auth/verify-request",
-    newUser: "/dashboard",
+    newUser: "/",
   },
 
   secret: process.env.NEXTAUTH_SECRET!,

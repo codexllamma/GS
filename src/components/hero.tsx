@@ -1,313 +1,266 @@
 "use client";
 
-import Image, { ImageProps } from "next/image";
+import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { HiOutlineLockClosed, HiOutlineTruck, HiOutlineRefresh } from "react-icons/hi";
+import { GiLion } from "react-icons/gi";
+import ProductCard from "./productCard";
 
-const CATEGORIES = [
-  { 
-    id: "cat_shirts",
-    name: "Shirts", 
-    image: "https://rzgwffrwwmxtnontocdv.supabase.co/storage/v1/object/public/images/hero/IMG_0393.avif", // <--- PASTE SHIRT URL HERE
-    link: "Shirts"
-  },
-  { 
-    id: "cat_trousers",
-    name: "Trousers", 
-    image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&q=80&w=800", // <--- PASTE TROUSER URL HERE
-    link: "Trousers"
-  },
-  { 
-    id: "cat_polos",
-    name: "Polos", 
-    image: "https://rzgwffrwwmxtnontocdv.supabase.co/storage/v1/object/public/images/hero/IMG_0661.avif", // <--- PASTE POLO URL HERE
-    link: "Polos"
-  }
-];
-
-
-export interface Product {
+interface Product {
   id: string;
   name: string;
   description: string;
   basePrice: number;
+  color: string;
+  fabric: string;
+  category: string;
   images: { url: string; isPrimary: boolean }[];
-  category?: string;
-  stock?: number;
-  createdAt?: string;
+  variants: { size: string; price: number; stock: number }[];
+  createdAt: string;
 }
 
-// --- HELPERS ---
-const getSafeUrl = (url: string) => {
-  if (!url) return "";
-  return url.replace(/ /g, "%20");
-};
+const CATEGORIES = [
+  { label: "ALL", value: "" },
+  { label: "SHIRTS", value: "shirts" },
+  { label: "POLOS", value: "polos" },
+  { label: "TROUSERS", value: "trousers" },
+];
 
-const preloadImage = (url: string) => {
-  return new Promise((resolve) => {
-    if (!url) { resolve(true); return; }
-    const img = new window.Image();
-    img.src = getSafeUrl(url);
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(true);
-  });
-};
+export default function Hero() {
+  const router = useRouter();
+  const [bestsellers, setBestsellers] = useState<Product[]>([]);
+  const [loadingBestsellers, setLoadingBestsellers] = useState(true);
 
-const SmoothImage = (props: ImageProps) => {
-  const [isReady, setIsReady] = useState(false);
+  const currentCategory = (router.query.category as string)?.toLowerCase() || "";
 
-  return (
-    <div className="relative w-full h-full">
-      <Image
-        {...props}
-        className={`${props.className || ""} transition-opacity duration-700 ease-out ${
-          isReady ? "opacity-100" : "opacity-0"
-        }`}
-        onLoad={(e) => {
-          setIsReady(true);
-          if (props.onLoad) props.onLoad(e);
-        }}
-      />
-      {!isReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50/10">
-           <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin"></div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const Hero = () => {
-  // Products for Lookbook only now
-  const [products, setProducts] = useState<Product[]>([]);
-  const [heroImages, setHeroImages] = useState<string[]>([]);
-  const [heroIndex, setHeroIndex] = useState(0);
-  
-  const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-
+  // Fetch Bestsellers on mount
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    async function fetchBestsellers() {
+      try {
+        const res = await fetch("/api/product?bestseller=true&limit=6");
+        if (res.ok) {
+          const data = await res.json();
+          setBestsellers(data);
+        }
+      } catch (err) {
+        console.error("Failed to load bestsellers:", err);
+      } finally {
+        setLoadingBestsellers(false);
+      }
+    }
+    fetchBestsellers();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        // A. Fetch Products (Used for Lookbook Carousel)
-        const productRes = await fetch("/api/product"); 
-        const productData = await productRes.json();
-        
-        const mappedProducts = Array.isArray(productData) ? productData.map((p: any) => ({
-          ...p,
-          createdAt: typeof p.createdAt === "string" ? p.createdAt : new Date(p.createdAt).toISOString(),
-          images: p.images ?? [],
-        })) : [];
+  // 1. In-place filter handler
+  const handleCategoryFilter = (catValue: string) => {
+    const { ...restQuery } = router.query;
+    
+    if (!catValue) {
+      delete restQuery.category;
+    } else {
+      restQuery.category = catValue;
+    }
 
-        // B. Fetch Hero Images (For Top Background)
-        const heroRes = await fetch("/api/hero");
-        const heroData = await heroRes.json();
-        const validHeroImages = Array.isArray(heroData) ? heroData : [];
-
-        // Preload Logic
-        if (!isMobile) {
-          // Preload Hero BG
-          const heroUrls = validHeroImages.slice(0, 2);
-          // Preload Category Images
-          const catUrls = CATEGORIES.map(c => c.image);
-          await Promise.all([...heroUrls, ...catUrls].map((url) => preloadImage(url)));
-        }
-
-        setProducts(mappedProducts);
-        setHeroImages(validHeroImages);
-
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [isMobile]);
-
-  // Auto-Rotate Top Hero Image
-  useEffect(() => {
-    if (heroImages.length <= 1) return;
-    const interval = setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % heroImages.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [heroImages]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-blue-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
-      </div>
+    router.push(
+      {
+        pathname: router.pathname,
+        query: restQuery,
+      },
+      undefined,
+      { shallow: true }
     );
-  }
+  };
 
-  const activeHeroImage = heroImages.length > 0 ? heroImages[heroIndex] : null;
+  // 2. Smooth scroll directly to the "SHOP THE COLLECTION" title
+  const scrollToCollection = () => {
+    const el = document.getElementById("shop-collection");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-white to-blue-50 font-apercu">
+    /* Pulls hero up flush behind the transparent sticky header */
+    <div className="w-full flex flex-col -mt-[66px] sm:-mt-[86px] md:-mt-[88px]">
+      {/* ---------------- 1. HERO BANNER ---------------- */}
+      <section className="relative w-full aspect-[4/5] sm:aspect-[16/9] max-h-[640px] bg-brand-stone overflow-hidden pt-[66px] sm:pt-[86px] md:pt-[88px]">
+        {/* Mobile Banner (4:5 Portrait) */}
+        <div className="block sm:hidden absolute inset-0">
+          <Image
+            src="/hero/hero-banner-mobile.avif"
+            alt="HIÈR Quiet Luxury Mobile"
+            fill
+            priority
+            className="object-cover object-top"
+            sizes="100vw"
+          />
+        </div>
 
-      {/* --- TOP SECTION: BANNER --- */}
-      <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-black">
-        <AnimatePresence mode="wait">
-          {activeHeroImage && (
-            <motion.div
-              key={activeHeroImage}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.5, ease: "easeInOut" }}
-              className="absolute inset-0"
-            >
-              <SmoothImage
-                src={getSafeUrl(activeHeroImage)}
-                alt="Atmosphere"
-                fill
-                className="object-cover"
-                priority={true}
-                unoptimized={true}
-              />
-              <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Desktop Banner (16:9 Landscape) */}
+        <div className="hidden sm:block absolute inset-0">
+          <Image
+            src="/hero/hero-banner-desktop.avif"
+            alt="HIÈR Quiet Luxury Desktop"
+            fill
+            priority
+            className="object-cover object-top"
+            sizes="100vw"
+          />
+        </div>
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30 z-10 pointer-events-none" />
+        {/* Gradient Overlay & Content */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent flex flex-col justify-end p-6 sm:p-10 text-white z-10">
+          <h1 className="font-serif text-3xl sm:text-5xl font-normal leading-tight max-w-sm tracking-wide">
+            Timeless staples.
+            <br />
+            Quiet luxury.
+          </h1>
+          <p className="text-[12px] sm:text-sm text-brand-lightText/90 mt-2 max-w-xs font-light leading-relaxed">
+            Crafted for those who understand simplicity is the ultimate sophistication.
+          </p>
 
-        <div className="relative z-20 text-center px-6 max-w-4xl mx-auto">
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
+          <button
+            onClick={scrollToCollection}
+            className="mt-5 w-fit bg-brand-btn text-brand-bg text-[11px] font-semibold tracking-widest uppercase px-6 py-3 rounded-sm hover:opacity-90 transition-opacity active:scale-95 cursor-pointer"
           >
-            <p className="text-4xl md:text-7xl font-sans text-white tracking-tight font-bold drop-shadow-xl leading-tight">
-              Step into a world of <br/> unmatched quality
-            </p>
-            <p className="mt-6 text-lg md:text-2xl text-gray-200 max-w-2xl mx-auto font-light leading-relaxed drop-shadow-md">
-              Your one-stop destination for timeless clothing.
-            </p>
+            EXPLORE COLLECTIONS
+          </button>
+        </div>
+      </section>
 
-            <Link href="/product/products">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="mt-10 bg-white text-black px-10 py-4 rounded-full shadow-2xl font-medium hover:bg-gray-100 transition-colors text-lg"
+      {/* ---------------- 2. TRUST BADGES ---------------- */}
+      <section className="bg-brand-card border-y border-brand-border py-5 px-3">
+        <div className="max-w-md mx-auto grid grid-cols-4 gap-2 text-center">
+          <div className="flex flex-col items-center">
+            <HiOutlineLockClosed className="w-5 h-5 text-brand-charcoal stroke-[1.4] mb-1" />
+            <span className="text-[9px] font-bold tracking-wider uppercase text-brand-charcoal leading-tight">
+              SECURE<br />PAYMENTS
+            </span>
+            <span className="text-[8px] text-brand-textSec mt-0.5">Razorpay</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <HiOutlineTruck className="w-5 h-5 text-brand-charcoal stroke-[1.4] mb-1" />
+            <span className="text-[9px] font-bold tracking-wider uppercase text-brand-charcoal leading-tight">
+              EXPRESS<br />SHIPPING
+            </span>
+            <span className="text-[8px] text-brand-textSec mt-0.5">by Shiprocket</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <HiOutlineRefresh className="w-5 h-5 text-brand-charcoal stroke-[1.4] mb-1" />
+            <span className="text-[9px] font-bold tracking-wider uppercase text-brand-charcoal leading-tight">
+              EASY<br />72HR RETURNS
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <GiLion className="w-5 h-5 text-brand-charcoal mb-1" />
+            <span className="text-[9px] font-bold tracking-wider uppercase text-brand-charcoal leading-tight">
+              MADE<br />IN INDIA
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------- 3. BESTSELLERS SECTION ---------------- */}
+      <section className="pt-7 pb-2 max-w-7xl mx-auto w-full">
+        <div className="flex justify-between items-end mb-3 px-4 sm:px-6 md:px-12">
+          <h2 className="text-sm font-bold tracking-[0.2em] text-brand-charcoal uppercase">
+            BESTSELLERS
+          </h2>
+          <button
+            onClick={scrollToCollection}
+            className="text-[11px] font-semibold tracking-wider text-brand-textSec hover:text-brand-charcoal underline underline-offset-4 uppercase cursor-pointer"
+          >
+            View all
+          </button>
+        </div>
+
+        {/* Fluid Mobile Scroll Track */}
+        <div className="flex md:grid md:grid-cols-4 gap-3.5 md:gap-6 overflow-x-auto snap-x snap-proximity overscroll-x-contain scroll-pl-4 sm:scroll-pl-6 px-4 sm:px-6 md:px-12 pt-0 pb-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {loadingBestsellers ? (
+            [...Array(4)].map((_, i) => (
+              <div
+                key={i}
+                className="w-[170px] sm:w-[220px] md:w-full flex-shrink-0 snap-start animate-pulse"
               >
-                Explore Collection
-              </motion.button>
-            </Link>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* --- REPLACED: SHOP BY CATEGORY (Instead of Products) --- */}
-      <section className="mt-16 px-4 md:px-20">
-        <h2 className="text-2xl md:text-3xl font-bold text-black mb-8 text-center tracking-tight">
-          Shop by Category
-        </h2>
-
-        {/* MOBILE UX FIX:
-            - 'grid-cols-2': Allows side-by-side items on mobile.
-            - First item gets 'col-span-2' to be the "Hero Category".
-            - Next two items fit side-by-side.
-            - RESULT: All 3 categories fit in one glance.
-        */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-8">
-          {CATEGORIES.map((cat, index) => (
-            <Link 
-              key={cat.id} 
-              href={`/product/products?category=${cat.link}`}
-              className={`
-                group relative overflow-hidden rounded-xl bg-neutral-100 shadow-sm 
-                ${index === 0 ? 'col-span-2 md:col-span-1' : 'col-span-1'}
-                aspect-[4/3] md:aspect-[3/4]
-              `}
-            >
-              {/* Image with Subtle Zoom */}
-              <SmoothImage
-                src={cat.image}
-                alt={cat.name}
-                fill
-                unoptimized={true}
-                priority={!isMobile} // Only prioritize the main ones
-                className="object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
-              />
-
-              {/* Elegant Dark Overlay 
-                  - Default: slightly dark (to make white text readable)
-                  - Hover: darker (focus effect)
-              */}
-              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-1800" />
-
-              {/* Centered Title (No Buttons) */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-                <h3 className="text-white text-2xl md:text-4xl font-bold tracking-widest uppercase drop-shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform duration-1800">
-                  {cat.name}
-                </h3>
-                
-                {/* Subtle "Shop" text that appears on hover (Desktop) or stays visible (Mobile) */}
-                <div className="overflow-hidden h-0 group-hover:h-auto md:h-0 transition-all duration-1800">
-                   <span className="text-white/90 text-xs md:text-sm font-medium tracking-widest border-b border-white/50 pb-0.5 mt-2 inline-block">
-                     EXPLORE
-                   </span>
-                </div>
+                <div className="aspect-[3/4] bg-brand-stone/60 rounded-sm" />
+                <div className="h-3 bg-brand-stone/80 rounded mt-2 w-3/4" />
+                <div className="h-3 bg-brand-stone/50 rounded mt-1.5 w-1/2" />
               </div>
-            </Link>
-          ))}
+            ))
+          ) : bestsellers.length > 0 ? (
+            bestsellers.map((product) => (
+              <div
+                key={product.id}
+                className="w-[170px] sm:w-[220px] md:w-full flex-shrink-0 snap-start"
+              >
+                <ProductCard product={product} priority={false} />
+              </div>
+            ))
+          ) : null}
+
+          <div className="w-1 shrink-0 md:hidden" />
         </div>
       </section>
 
-      {/* --- LOOKBOOK CAROUSEL --- */}
-      <section className="mt-24 mb-20 px-0 md:px-20 overflow-hidden">
-        <h2 className="text-3xl font-bold text-black mb-10 text-center tracking-tight">
-          Lookbook
+      {/* ---------------- 4. EDITORIAL QUOTE BANNER ---------------- */}
+      <section className="relative w-full aspect-[16/9] sm:aspect-[21/9] max-h-[320px] bg-brand-stone overflow-hidden my-4 sm:my-6">
+  {/* Mobile Banner (16:9 / 2:1) */}
+  <div className="block sm:hidden absolute inset-0">
+    <Image
+      src="/hero/editorial-strip-mobile.avif"
+      alt="HIÈR Editorial Mood"
+      fill
+      className="object-cover object-center"
+      sizes="100vw"
+    />
+  </div>
+
+  {/* Desktop Banner (21:9 Ultra-Wide Ribbon) */}
+  <div className="hidden sm:block absolute inset-0">
+    <Image
+      src="/hero/editorial-strip-desktop.avif"
+      alt="HIÈR Editorial Mood"
+      fill
+      className="object-cover object-center"
+      sizes="100vw"
+    />
+  </div>
+
+  {/* Subtle Vignette / Contrast Overlay */}
+  <div className="absolute inset-0 bg-black/15 pointer-events-none" />
+</section>
+
+      {/* ---------------- 5. SHOP THE COLLECTION (SCROLL TARGET) ---------------- */}
+      <section id="shop-collection" className="scroll-mt-20 px-4 sm:px-6 pt-2 pb-2 max-w-4xl mx-auto w-full">
+        <h2 className="text-[13px] font-bold tracking-[0.2em] text-brand-charcoal uppercase mb-3 text-center sm:text-left">
+          SHOP THE COLLECTION
         </h2>
 
-        <div className="relative w-full">
-           <div className="absolute left-0 top-0 bottom-0 w-12 md:w-32 bg-gradient-to-r from-blue-50/90 to-transparent z-10 pointer-events-none" />
-           <div className="absolute right-0 top-0 bottom-0 w-12 md:w-32 bg-gradient-to-l from-blue-50/90 to-transparent z-10 pointer-events-none" />
-
-          <motion.div
-            className="flex gap-6 w-max"
-            animate={{ x: ["0%", "-50%"] }}
-            transition={{ 
-              duration: 40, 
-              repeat: Infinity, 
-              ease: "linear",
-              repeatType: "loop"
-            }}
-          >
-            {[...products, ...products].map((product, index) => {
-              const rawUrl = product.images?.[0]?.url;
-              if (!rawUrl) return null;
-              const safeUrl = getSafeUrl(rawUrl);
-
-              return (
-                <div key={`${product.id}-lookbook-${index}`} className="relative w-[300px] h-[400px] md:w-[400px] md:h-[500px] flex-shrink-0 rounded-2xl overflow-hidden shadow-md bg-gray-100">
-                   <SmoothImage
-                    src={safeUrl}
-                    alt="Lookbook"
-                    fill
-                    unoptimized={true}
-                    className="object-cover"
-                    sizes="400px"
-                  />
-                </div>
-              );
-            })}
-          </motion.div>
+        <div className="grid grid-cols-4 bg-brand-stone/60 p-1 rounded-sm border border-brand-border">
+          {CATEGORIES.map((cat) => {
+            const isActive =
+              cat.value === currentCategory || (!cat.value && !currentCategory);
+            return (
+              <button
+                key={cat.label}
+                onClick={() => handleCategoryFilter(cat.value)}
+                className={`py-2 text-[11px] font-semibold tracking-wider uppercase transition-all rounded-[2px] cursor-pointer ${
+                  isActive
+                    ? "bg-brand-olive text-white shadow-sm"
+                    : "text-brand-charcoal hover:text-black"
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
         </div>
       </section>
-
     </div>
   );
-};
-
-export default Hero;
+}

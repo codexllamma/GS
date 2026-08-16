@@ -1,10 +1,9 @@
-
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
-  
+  res.setHeader("Cache-Control", "no-store, max-age=0, must-revalidate");
+
   if (req.method === "GET") {
     try {
       const page = Number(req.query.page) || 1;
@@ -13,10 +12,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const category = req.query.category as string;
       const search = req.query.search as string;
+      const bestseller = req.query.bestseller as string;
 
       const whereClause: any = { isDeleted: false };
 
-      // 1. Filter by Category (Strict Match)
+      // 1. Filter by Bestseller Flag
+      if (bestseller === "true") {
+        whereClause.isBestseller = true;
+      }
+
+      // 2. Filter by Category (Strict Match)
       if (category && category !== "All") {
         whereClause.fabric = {
           category: {
@@ -24,26 +29,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         };
       }
-      
-      // 2. Smart Search (Tokenized)
+
+      // 3. Smart Search (Tokenized)
       // "White Shirt" -> Matches products having BOTH "White" AND "Shirt"
-      
       if (search) {
         const searchTerms = search.trim().split(/\s+/);
-        
+
         whereClause.AND = searchTerms.map((term) => ({
           OR: [
             { name: { contains: term, mode: "insensitive" } },
             { description: { contains: term, mode: "insensitive" } },
             { color: { contains: term, mode: "insensitive" } },
             // Also search within the Category Name (e.g., searching "Polo" finds items in Polo category)
-            { 
-              fabric: { 
-                category: { 
-                  name: { contains: term, mode: "insensitive" } 
-                } 
-              } 
-            }
+            {
+              fabric: {
+                category: {
+                  name: { contains: term, mode: "insensitive" },
+                },
+              },
+            },
           ],
         }));
       }
@@ -54,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: whereClause,
         orderBy: [
           { sortOrder: "desc" },
-          { createdAt: "desc" } 
+          { createdAt: "desc" }
         ],
         include: {
           images: true,
@@ -66,21 +70,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         },
       });
-      
 
-      const serializedProducts = products.map((p) => ({
+      const serializedProducts = products.map((p: any) => ({
         id: p.id,
         name: p.name,
         description: p.description,
         basePrice: p.basePrice,
         color: p.color,
+        isBestseller: p.isBestseller ?? false,
         fabric: p.fabric?.name || null,
         category: p.fabric?.category?.name || null,
-        images: p.images.map((img) => ({
+        images: p.images.map((img: any) => ({
           url: img.url,
           isPrimary: img.isPrimary,
         })),
-        variants: p.variants.map((v) => ({
+        variants: p.variants.map((v: any) => ({
           size: v.size,
           price: v.price,
           stock: v.stock,

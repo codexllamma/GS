@@ -4,78 +4,71 @@
 @tailwind components;
 @tailwind utilities;
 
-
-
 /* -------------------------------------------------
-   Root variables — Light theme (default)
+   HIÈR Palette — Root Design Tokens
 -------------------------------------------------- */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  /* Brand Palette (Hex values stored for global reference) */
+  --brand-bg: #F8F7F3;
+  --brand-card: #F1EEE7;
+  --brand-sage: #626B5A;
+  --brand-olive: #3E4638;
+  --brand-stone: #E6E1D6;
+  --brand-border: #E0DDD6;
+  --brand-charcoal: #2F3335;
+  --brand-text-sec: #6B6F72;
+  --brand-caption: #8D8F93;
+  --brand-disabled: #A6A9AD;
+  --brand-btn: #4F5A46;
+  --brand-alt-bg: #EEF3EC;
+  --brand-success: #DCE2D7;
+  --brand-light-text: #D7D7D7;
 
-  --background: 0 0% 100%;
-  --foreground: 0 0% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 3.9%;
-  --primary: 0 0% 9%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 96.1%;
-  --secondary-foreground: 0 0% 9%;
-  --muted: 0 0% 96.1%;
-  --muted-foreground: 0 0% 45.1%;
-  --accent: 0 0% 96.1%;
-  --accent-foreground: 0 0% 9%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 89.8%;
-  --input: 0 0% 89.8%;
-  --ring: 0 0% 3.9%;
-  --radius: 0.5rem;
+  /* UI Component Mappings */
+  --background: #F8F7F3;
+  --foreground: #2F3335;
+  --card: #F1EEE7;
+  --card-foreground: #2F3335;
+  --popover: #F8F7F3;
+  --popover-foreground: #2F3335;
+  --primary: #4F5A46;
+  --primary-foreground: #F8F7F3;
+  --secondary: #E6E1D6;
+  --secondary-foreground: #2F3335;
+  --muted: #EEF3EC;
+  --muted-foreground: #6B6F72;
+  --accent: #3E4638;
+  --accent-foreground: #D7D7D7;
+  --border: #E0DDD6;
+  --input: #E0DDD6;
+  --ring: #4F5A46;
+  --radius: 0.25rem;
 }
 
 /* -------------------------------------------------
-   Dark theme — only when .dark class is added
--------------------------------------------------- */
-.dark {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 0, 0, 0;
-  --background-end-rgb: 0, 0, 0;
-
-  --background: 0 0% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 0 0% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 0 0% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 0 0% 9%;
-  --secondary: 0 0% 14.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 14.9%;
-  --muted-foreground: 0 0% 63.9%;
-  --accent: 0 0% 14.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 14.9%;
-  --input: 0 0% 14.9%;
-  --ring: 0 0% 83.1%;
-}
-
-/* -------------------------------------------------
-   Base styles
+   Base Typography & Reset
 -------------------------------------------------- */
 @layer base {
   html {
     scroll-behavior: smooth;
+    background-color: var(--brand-bg);
   }
 
   body {
-    @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))] antialiased;
-    font-family: Arial, Helvetica, sans-serif;
+    background-color: var(--brand-bg);
+    color: var(--brand-charcoal);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, .font-serif {
+    font-family: var(--font-serif);
+    color: var(--brand-charcoal);
+  }
+
+  p, span, button, input, textarea {
+    font-family: var(--font-sans);
   }
 }
 
@@ -85,10 +78,14 @@
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

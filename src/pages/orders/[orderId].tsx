@@ -1,39 +1,75 @@
-import { useRouter } from "next/router";
+"use client";
+
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Package,
+  Truck,
+  RotateCcw,
+  ExternalLink,
+  Loader2,
+  Calendar,
+  CreditCard,
+  MapPin,
+  ShieldCheck,
+  Mail,
+  HelpCircle,
+  Clock,
+} from "lucide-react";
 import { motion } from "framer-motion";
 
 interface ProductImage {
   url: string;
 }
 
-interface Fabric {
-  name: string;
-}
-
 interface Product {
   id: string;
   name: string;
-  basePrice: number;
-  color: string;
-  fabric?: Fabric;
+  color?: string;
+  fabric?: string | { name: string };
   images: ProductImage[];
+}
+
+interface ProductVariant {
+  id?: string;
+  size: string;
+  product?: Product;
 }
 
 interface OrderItem {
   id: string;
   quantity: number;
-  priceAtPurchase: number;
-  productId: string;
-  product: Product; // Directly attached to OrderItem
+  priceAtPurchase?: number;
+  price?: number;
+  variant?: ProductVariant;
+  product?: Product;
+}
+
+interface Address {
+  line1: string;
+  line2?: string | null;
+  city: string;
+  state: string;
+  postal: string;
+  country: string;
 }
 
 interface Order {
   id: string;
   status: string;
   total: number;
+  subtotal?: number;
   paymentMethod: string;
+  paymentStatus?: string;
+  trackingUrl?: string | null;
+  returnUrl?: string | null;
+  awbCode?: string | null;
+  courierName?: string | null;
+  address?: Address | null;
   createdAt: string;
+  deliveredAt?: string | null;
   orderItems: OrderItem[];
 }
 
@@ -48,8 +84,11 @@ export default function OrderDetailPage() {
 
     const fetchOrder = async () => {
       try {
-        const res = await axios.get(`/api/orders/${orderId}`);
-        setOrder(res.data);
+        const res = await fetch(`/api/orders/${orderId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setOrder(data);
+        }
       } catch (error) {
         console.error("Error fetching order details:", error);
       } finally {
@@ -60,120 +99,386 @@ export default function OrderDetailPage() {
     fetchOrder();
   }, [orderId]);
 
-  if (loading)
+  // 72-Hour Return Window Eligibility Check
+  const isReturnEligible = () => {
+    if (!order) return false;
+    const baseDate = order.deliveredAt ? new Date(order.deliveredAt) : new Date(order.createdAt);
+    const diffHours = (new Date().getTime() - baseDate.getTime()) / (1000 * 60 * 60);
+    return diffHours <= 72 && order.status.toUpperCase() !== "CANCELLED";
+  };
+
+  const getStatusBadge = (status: string) => {
+    const normalized = status?.toUpperCase() || "CONFIRMED";
+    switch (normalized) {
+      case "DELIVERED":
+        return (
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-brand-olive/10 text-brand-olive border border-brand-olive/20 rounded-xs">
+            Delivered
+          </span>
+        );
+      case "SHIPPED":
+      case "IN_TRANSIT":
+        return (
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-brand-charcoal text-white rounded-xs">
+            In Transit
+          </span>
+        );
+      case "RETURN_REQUESTED":
+      case "RETURN_IN_PROGRESS":
+        return (
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-xs">
+            Return in Progress
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-xs">
+            Cancelled
+          </span>
+        );
+      default:
+        return (
+          <span className="text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 bg-brand-card text-brand-charcoal border border-brand-border rounded-xs">
+            {status || "Confirmed"}
+          </span>
+        );
+    }
+  };
+
+  // 1. LOADING STATE
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Loading order details...
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-2.5">
+          <Loader2 size={24} className="animate-spin text-brand-charcoal stroke-[1.5]" />
+          <span className="text-[10px] uppercase tracking-[0.25em] text-brand-textSec font-medium">
+            Retrieving Order Record...
+          </span>
+        </div>
       </div>
     );
+  }
 
-  if (!order)
+  // 2. ERROR / NOT FOUND STATE
+  if (!order) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Order not found or you don’t have permission to view it.
-      </div>
-    );
-
-  return (
-    <div className="min-h-screen bg-white py-12 px-6">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-light tracking-tight text-black mb-12">
-          Order Details
-        </h1>
-
-        {/* Order Info */}
-        <div className="border border-neutral-300 rounded-2xl p-8 flex flex-col gap-2 text-sm text-neutral-700 mb-12">
-          <p className="font-medium text-black">
-            Order ID: <span className="font-normal">{order.id}</span>
+      <div className="min-h-screen bg-brand-bg text-brand-charcoal font-sans flex flex-col items-center justify-center px-4">
+        <div className="bg-white border border-brand-border rounded-sm p-6 sm:p-10 text-center max-w-sm w-full shadow-xs">
+          <Package size={26} className="text-brand-caption stroke-[1.5] mx-auto mb-2.5" />
+          <h1 className="font-serif text-lg font-medium text-brand-charcoal">Order Record Unavailable</h1>
+          <p className="text-xs text-brand-textSec mt-1 leading-relaxed mb-5">
+            We were unable to locate this order. It may belong to another client profile or has been archived.
           </p>
-          <p>
-            Placed on{" "}
-            <span className="text-black">
-              {new Date(order.createdAt).toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </span>
-          </p>
-          <p>
-            Payment Method:{" "}
-            <span className="text-black font-medium">{order.paymentMethod}</span>
-          </p>
-          <p>
-            Total Amount:{" "}
-            <span className="text-black font-semibold">
-              ₹{order.total.toLocaleString()}
-            </span>
-          </p>
-          <p>
-            Status: <span className="text-black font-medium">{order.status}</span>
-          </p>
-        </div>
-
-        {/* Items */}
-        <div className="border-t border-neutral-200 pt-8 space-y-6">
-          <h2 className="text-lg font-medium text-black mb-4">
-            Ordered Items
-          </h2>
-
-          {order.orderItems.map((item) => {
-            const product = item.product;
-            const image = product?.images?.[0]?.url || "/placeholder.png";
-            return (
-              <div
-                key={item.id}
-                className="border border-neutral-200 rounded-xl p-6 flex items-center gap-6"
-              >
-                <div className="w-24 h-24 bg-gray-100 overflow-hidden rounded-lg flex-shrink-0 border border-neutral-200">
-                  <img
-                    src={image}
-                    alt={product?.name || "Product"}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1 text-sm text-neutral-700">
-                  <p className="font-medium text-black">{product?.name}</p>
-                  {product?.color && (
-                    <p className="text-neutral-500">Color: {product.color}</p>
-                  )}
-                  {product?.fabric?.name && (
-                    <p className="text-neutral-500">Fabric: {product.fabric.name}</p>
-                  )}
-                  <p className="text-neutral-500">Quantity: {item.quantity}</p>
-                  <p className="text-neutral-500">
-                    Price: ₹{item.priceAtPurchase.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 mt-12">
-          <motion.button
-            onClick={() => router.push(`/order-tracking/${order.id}`)}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            transition={{ duration: 0.35 }}
-            className="border border-black text-black text-sm px-6 py-2 rounded-full hover:bg-black hover:text-white transition-all duration-350 cursor-pointer"
-          >
-            Track Order
-          </motion.button>
-
-          <motion.button
-            onClick={() => router.push("/orders")}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            transition={{ duration: 0.35 }}
-            className="border border-black text-black text-sm px-6 py-2 rounded-full hover:bg-black hover:text-white transition-all duration-350 cursor-pointer"
+          <Link
+            href="/orders/orders-page"
+            className="inline-flex items-center justify-center px-5 py-2.5 bg-brand-btn text-white text-[11px] font-semibold uppercase tracking-widest rounded-sm hover:opacity-90 transition active:scale-[0.99]"
           >
             Back to Orders
-          </motion.button>
+          </Link>
         </div>
       </div>
+    );
+  }
+
+  const shiprocketTrackingUrl =
+    order.trackingUrl ||
+    (order.awbCode ? `https://shiprocket.co/tracking/${order.awbCode}` : null);
+
+  const shiprocketReturnUrl =
+    order.returnUrl ||
+    (order.awbCode
+      ? `https://shiprocket.co/tracking/${order.awbCode}?action=return`
+      : `mailto:support@hièr.store?subject=${encodeURIComponent(
+          `Return Request for Order #${order.id.slice(-8).toUpperCase()}`
+        )}`);
+
+  // 3. MAIN ORDER SUMMARY UI
+  return (
+    <div className="min-h-screen bg-brand-bg text-brand-charcoal font-sans selection:bg-brand-olive selection:text-white py-6 sm:py-10 px-4 sm:px-6 md:px-8">
+      <main className="max-w-4xl w-full mx-auto space-y-4 sm:space-y-5">
+        
+        {/* Top Breadcrumb Navigation */}
+        <div className="flex items-center justify-between pb-1">
+          <Link
+            href="/orders/orders-page"
+            className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-textSec hover:text-brand-charcoal transition-colors cursor-pointer group"
+          >
+            <ArrowLeft size={13} className="transition-transform duration-200 group-hover:-translate-x-1" />
+            <span>Back to Orders</span>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            {getStatusBadge(order.status)}
+          </div>
+        </div>
+
+        {/* Order Header Summary Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22 }}
+          className="bg-white border border-brand-border rounded-sm p-4.5 sm:p-6 shadow-xs"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 sm:pb-5 border-b border-brand-border gap-3.5">
+            <div>
+              <span className="text-[9px] font-bold tracking-[0.25em] text-brand-charcoal uppercase block mb-0.5">
+                ORDER RECEIPT
+              </span>
+              <h1 className="font-serif text-xl sm:text-2xl font-normal text-brand-charcoal tracking-wide">
+                #{order.id.slice(-8).toUpperCase()}
+              </h1>
+            </div>
+
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              {/* Live Shiprocket Tracking */}
+              {shiprocketTrackingUrl ? (
+                <a
+                  href={shiprocketTrackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-10 px-4 bg-white border border-brand-border hover:border-brand-charcoal text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center gap-1.5 shadow-xs active:scale-[0.99] cursor-pointer"
+                >
+                  <Truck size={13} className="stroke-[1.6]" />
+                  <span>Track on Shiprocket</span>
+                  <ExternalLink size={11} className="text-brand-textSec" />
+                </a>
+              ) : (
+                <div className="h-10 px-4 bg-brand-stone/20 text-brand-textSec text-[10px] font-semibold uppercase tracking-widest rounded-sm flex items-center gap-1.5 select-none">
+                  <Clock size={12} />
+                  <span>Awaiting Pickup</span>
+                </div>
+              )}
+
+              {/* 72HR Return Action Button */}
+              {isReturnEligible() ? (
+                <a
+                  href={shiprocketReturnUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-10 px-4 bg-brand-card hover:bg-brand-stone/40 border border-brand-border text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center gap-1.5 shadow-xs active:scale-[0.99] cursor-pointer"
+                >
+                  <RotateCcw size={12} className="stroke-[1.6]" />
+                  <span>Request Return</span>
+                </a>
+              ) : (
+                <div
+                  title="Returns are eligible within 72 hours of delivery"
+                  className="h-10 px-3.5 bg-brand-card/40 border border-dashed border-brand-border text-brand-textSec text-[10px] font-semibold uppercase tracking-wider rounded-sm flex items-center gap-1 select-none"
+                >
+                  <ShieldCheck size={12} className="text-brand-olive" />
+                  <span>72hr Window</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Meta Information Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-4 sm:pt-5">
+            <div>
+              <span className="text-[9px] uppercase tracking-widest text-brand-textSec font-semibold block">
+                Booking Date
+              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Calendar size={12} className="text-brand-textSec flex-shrink-0" />
+                <span className="text-xs font-medium text-brand-charcoal">
+                  {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[9px] uppercase tracking-widest text-brand-textSec font-semibold block">
+                Payment Mode
+              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <CreditCard size={12} className="text-brand-textSec flex-shrink-0" />
+                <span className="text-xs font-medium text-brand-charcoal capitalize">
+                  {order.paymentMethod || "Prepaid"}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[9px] uppercase tracking-widest text-brand-textSec font-semibold block">
+                Logistics Partner
+              </span>
+              <span className="text-xs font-medium text-brand-charcoal mt-0.5 block truncate">
+                {order.courierName || "Shiprocket Express"}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[9px] uppercase tracking-widest text-brand-textSec font-semibold block">
+                AWB Consignment
+              </span>
+              <span className="text-xs font-medium text-brand-charcoal mt-0.5 block truncate">
+                {order.awbCode || "Generating..."}
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Ordered Items Breakdown */}
+        <div className="bg-white border border-brand-border rounded-sm p-4.5 sm:p-6 shadow-xs">
+          <h2 className="text-[11px] font-bold tracking-[0.2em] text-brand-charcoal uppercase mb-3.5">
+            Purchased Essentials
+          </h2>
+
+          <div className="divide-y divide-brand-border/60">
+            {order.orderItems?.map((item) => {
+              const product = item.variant?.product || item.product;
+              const fabricName =
+                typeof product?.fabric === "string"
+                  ? product.fabric
+                  : product?.fabric?.name || "";
+              const image =
+                product?.images?.[0]?.url ||
+                "https://placehold.co/200x260/png?text=Item";
+              const unitPrice = item.priceAtPurchase || item.price || 0;
+
+              return (
+                <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-center gap-3.5 sm:gap-4">
+                  {/* Garment Image */}
+                  <div className="w-14 sm:w-16 h-18 sm:h-20 bg-brand-stone/30 rounded-sm overflow-hidden flex-shrink-0 border border-brand-border">
+                    <img
+                      src={image}
+                      alt={product?.name || "Garment"}
+                      className="w-full h-full object-cover object-top"
+                    />
+                  </div>
+
+                  {/* Garment Specifications */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-serif text-xs sm:text-sm font-medium text-brand-charcoal tracking-wide truncate">
+                      {product?.name || "Signature Garment"}
+                    </h3>
+                    <p className="text-[11px] text-brand-textSec mt-0.5">
+                      {fabricName ? `${fabricName} · ` : ""}
+                      {product?.color || "Standard"}
+                    </p>
+
+                    <div className="flex items-center gap-2.5 mt-1 text-[10px] sm:text-[11px] font-medium text-brand-charcoal">
+                      <span>Size: {item.variant?.size || "Standard"}</span>
+                      <span className="text-brand-border">|</span>
+                      <span>Qty: {item.quantity}</span>
+                    </div>
+                  </div>
+
+                  {/* Price */}
+                  <div className="text-right">
+                    <span className="text-xs sm:text-sm font-semibold text-brand-charcoal">
+                      ₹{(unitPrice * item.quantity).toLocaleString("en-IN")}
+                    </span>
+                    {item.quantity > 1 && (
+                      <span className="text-[10px] text-brand-textSec block mt-0.5">
+                        ₹{unitPrice.toLocaleString("en-IN")} each
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Delivery Address & Financial Settlement Grid */}
+        <div className="grid sm:grid-cols-2 gap-4 sm:gap-5">
+          {/* Shipping Address Card */}
+          <div className="bg-white border border-brand-border rounded-sm p-4.5 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 mb-2.5">
+                <MapPin size={14} className="text-brand-textSec stroke-[1.6]" />
+                <h3 className="text-[10px] font-bold tracking-[0.2em] text-brand-charcoal uppercase">
+                  Delivery Destination
+                </h3>
+              </div>
+
+              {order.address ? (
+                <div className="text-xs text-brand-charcoal leading-relaxed space-y-0.5 font-light">
+                  <p className="font-medium">{order.address.line1}</p>
+                  {order.address.line2 && <p>{order.address.line2}</p>}
+                  <p className="text-brand-textSec">
+                    {order.address.city}, {order.address.state} {order.address.postal}
+                  </p>
+                  <p className="text-brand-textSec">{order.address.country}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-brand-textSec italic">Shipping address recorded on file.</p>
+              )}
+            </div>
+
+            <div className="pt-3 mt-3 border-t border-brand-border/60 flex items-center gap-1.5 text-[10px] sm:text-[11px] text-brand-textSec">
+              <ShieldCheck size={13} className="text-brand-olive flex-shrink-0" />
+              <span>Complimentary insured shipping</span>
+            </div>
+          </div>
+
+          {/* Pricing Ledger */}
+          <div className="bg-white border border-brand-border rounded-sm p-4.5 sm:p-5 shadow-xs space-y-2.5">
+            <h3 className="text-[10px] font-bold tracking-[0.2em] text-brand-charcoal uppercase mb-2.5">
+              Settlement Summary
+            </h3>
+
+            <div className="flex justify-between text-xs text-brand-textSec font-light">
+              <span>Subtotal</span>
+              <span className="text-brand-charcoal font-medium">
+                ₹{(order.subtotal || order.total).toLocaleString("en-IN")}
+              </span>
+            </div>
+
+            <div className="flex justify-between text-xs text-brand-textSec font-light">
+              <span>Shipping & Logistics</span>
+              <span className="text-brand-olive font-medium uppercase text-[10px] tracking-wider">
+                Complimentary
+              </span>
+            </div>
+
+            <div className="flex justify-between text-xs text-brand-textSec font-light">
+              <span>GST & Taxes (18%)</span>
+              <span className="text-brand-charcoal font-medium">Included</span>
+            </div>
+
+            <div className="pt-2.5 border-t border-brand-border flex justify-between items-baseline">
+              <span className="text-xs font-semibold uppercase tracking-wider text-brand-charcoal">
+                Total Paid
+              </span>
+              <span className="font-serif text-base sm:text-lg font-semibold text-brand-charcoal">
+                ₹{order.total.toLocaleString("en-IN")}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Concierge Assistance Footer with Fixed Action Button */}
+        <div className="p-4 sm:p-5 bg-brand-card/40 border border-brand-border rounded-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+          <div className="flex items-center gap-3">
+            <HelpCircle size={17} className="text-brand-textSec flex-shrink-0 hidden sm:block stroke-[1.6]" />
+            <div>
+              <p className="text-xs font-medium text-brand-charcoal">Require Assistance with this Order?</p>
+              <p className="text-[11px] text-brand-textSec mt-0.5 font-light">
+                Our concierge team is available to assist with alterations, fit advice, and exchanges.
+              </p>
+            </div>
+          </div>
+
+          <a
+            href={`mailto:support@hièr.store?subject=${encodeURIComponent(
+              `Assistance with Order #${order.id.slice(-8).toUpperCase()}`
+            )}&body=${encodeURIComponent(
+              `Hi HIÈR Concierge,\n\nI need assistance with my Order #${order.id}.\n\nQuery Details:\n`
+            )}`}
+            className="w-full sm:w-auto h-10 px-5 bg-white border border-brand-border hover:border-brand-charcoal text-brand-charcoal text-[10px] sm:text-[11px] font-semibold uppercase tracking-widest rounded-sm transition-all shadow-xs active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer flex-shrink-0"
+          >
+            <Mail size={13} className="stroke-[1.6]" />
+            <span>Contact Concierge</span>
+          </a>
+        </div>
+
+      </main>
     </div>
   );
 }

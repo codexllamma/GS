@@ -3,8 +3,8 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/router";
-import { ShoppingBag, ChevronLeft, ChevronRight } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
+import { motion, useMotionValue, animate } from "framer-motion";
 
 const getSafeUrl = (url: string) => {
   if (!url) return "";
@@ -28,11 +28,12 @@ interface ProductCardProps {
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
   const router = useRouter();
   const [currentImage, setCurrentImage] = useState(0);
-  const [direction, setDirection] = useState(1);
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
   const hasPrefetched = useRef(false);
+
   const images = product.images || [];
+  const x = useMotionValue(0);
 
   const handleMouseEnter = () => {
     if (!hasPrefetched.current && images.length > 1) {
@@ -45,24 +46,66 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     }
   };
 
-  const handleNext = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDirection(1);
-    setCurrentImage((prev) => (prev + 1) % images.length);
-    setImgSrc(null);
+  const slideToIndex = (index: number) => {
+    if (!containerRef.current) return;
+    const width = containerRef.current.offsetWidth;
+    setCurrentImage(index);
+    animate(x, -index * width, {
+      type: "spring",
+      stiffness: 350,
+      damping: 35,
+      mass: 0.5,
+    });
   };
 
-  const handlePrev = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDirection(-1);
-    setCurrentImage((prev) => (prev - 1 + images.length) % images.length);
-    setImgSrc(null);
+  const handleNext = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (images.length <= 1) return;
+    const nextIndex = (currentImage + 1) % images.length;
+    slideToIndex(nextIndex);
   };
 
-  // Triggers shallow URL push to open ProductModal on the single page
-  const handleOpenQuickView = (e: React.MouseEvent) => {
+  const handlePrev = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (images.length <= 1) return;
+    const prevIndex = (currentImage - 1 + images.length) % images.length;
+    slideToIndex(prevIndex);
+  };
+
+  const handleDragStart = () => {
+    isDragging.current = true;
+  };
+
+  const handleDragEnd = (_: any, info: { offset: { x: number }; velocity: { x: number } }) => {
+    setTimeout(() => {
+      isDragging.current = false;
+    }, 50);
+
+    if (images.length <= 1 || !containerRef.current) return;
+
+    const width = containerRef.current.offsetWidth;
+    const swipeThreshold = width * 0.2;
+    const velocityThreshold = 300;
+
+    let targetIndex = currentImage;
+
+    if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+      targetIndex = Math.min(currentImage + 1, images.length - 1);
+    } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+      targetIndex = Math.max(currentImage - 1, 0);
+    }
+
+    slideToIndex(targetIndex);
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (isDragging.current) return;
     e.preventDefault();
     router.push(
       { query: { ...router.query, product: product.id } },
@@ -71,76 +114,111 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     );
   };
 
-  const activeUrl = imgSrc || getSafeUrl(images[currentImage]?.url);
-  const finalUrl = activeUrl || "https://placehold.co/600x800/png?text=No+Image";
-
   return (
-    <div 
-      onClick={handleOpenQuickView}
-      onMouseEnter={handleMouseEnter} 
-      className="group relative flex flex-col cursor-pointer transition-transform duration-500 hover:scale-[1.005]"
+    <div
+      onClick={handleCardClick}
+      onMouseEnter={handleMouseEnter}
+      className="group relative flex flex-col cursor-pointer transition-all duration-300 select-none"
     >
+      {/* Continuous Spring Carousel Box */}
       <div
-        className="relative block w-full aspect-[3/5] sm:aspect-[4/5] md:aspect-[10/12]
-          overflow-hidden bg-neutral-100 border border-neutral-200"
+        ref={containerRef}
+        className="relative block w-full aspect-[3/4] overflow-hidden rounded-sm bg-brand-card border border-brand-border touch-pan-y"
       >
-        <AnimatePresence mode="wait" initial={false}>
+        {images.length > 0 ? (
           <motion.div
-            key={currentImage}
-            initial={{ opacity: 0, x: direction === 1 ? 20 : -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction === 1 ? -20 : 20 }}
-            transition={{
-              duration: 0.4,
-              ease: "easeInOut",
+            className="flex h-full w-full cursor-grab active:cursor-grabbing"
+            style={{ x }}
+            drag="x"
+            dragDirectionLock
+            dragConstraints={{
+              left: -((images.length - 1) * (containerRef.current?.offsetWidth || 0)),
+              right: 0,
             }}
-            className="absolute inset-0"
+            dragElastic={0.12}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
           >
+            {images.map((img, idx) => {
+              const url = getSafeUrl(img.url) || "https://placehold.co/600x800/png?text=No+Image";
+              return (
+                <div key={idx} className="relative h-full w-full flex-shrink-0 min-w-full">
+                  <Image
+                    src={url}
+                    alt={product.name}
+                    fill
+                    unoptimized={true}
+                    priority={priority && idx === 0}
+                    className="object-cover object-top pointer-events-none transition-transform duration-700 group-hover:scale-[1.02]"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  />
+                </div>
+              );
+            })}
+          </motion.div>
+        ) : (
+          <div className="relative h-full w-full">
             <Image
-              src={finalUrl}
+              src="https://placehold.co/600x800/png?text=No+Image"
               alt={product.name}
               fill
-              unoptimized={true} 
-              priority={priority} 
-              className="object-cover transition-all duration-700 group-hover:scale-[1.02] group-hover:brightness-[1.05]"
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              onError={() => {
-                setImgSrc("https://placehold.co/600x800/png?text=Image+Error");
-              }}
+              className="object-cover"
             />
-          </motion.div>
-        </AnimatePresence>
+          </div>
+        )}
 
+        {/* Desktop Arrow Navigation */}
         {images.length > 1 && (
           <>
             <button
               onClick={handlePrev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 text-black opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white transition-all rounded-sm z-10"
+              className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 bg-white/85 text-brand-charcoal opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white transition-all rounded-full z-10 shadow-sm"
+              aria-label="Previous image"
             >
               <ChevronLeft size={14} />
             </button>
             <button
               onClick={handleNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 text-black opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white transition-all rounded-sm z-10"
+              className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 bg-white/85 text-brand-charcoal opacity-0 group-hover:opacity-100 p-1.5 hover:bg-white transition-all rounded-full z-10 shadow-sm"
+              aria-label="Next image"
             >
               <ChevronRight size={14} />
             </button>
+
+            {/* Brand Green Dots */}
+            <div className="absolute bottom-2.5 inset-x-0 flex justify-center items-center space-x-1.5 pointer-events-none z-10">
+              {images.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    currentImage === i
+                      ? "w-3.5 bg-brand-btn shadow-sm"
+                      : "w-1.5 bg-brand-btn/30"
+                  }`}
+                />
+              ))}
+            </div>
           </>
         )}
       </div>
 
-      <div className="flex flex-col mt-3 px-1 select-none">
-        <h3 className="font-apercu text-[1.05rem] font-medium tracking-tight line-clamp-1 group-hover:text-black transition-colors duration-200">
+      {/* Card Details */}
+      <div className="flex flex-col mt-2.5 px-0.5">
+        <h3 className="font-serif text-[12px] sm:text-[13px] font-medium tracking-wider uppercase text-brand-charcoal line-clamp-1 group-hover:text-brand-olive transition-colors">
           {product.name}
         </h3>
-        <div className="font-apercu flex items-center justify-between mt-1">
-          <p className="text-[14px] text-gray-700">₹{product.basePrice}</p>
+
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-[13px] font-medium text-brand-charcoal">
+            ₹{product.basePrice.toLocaleString("en-IN")}
+          </p>
+
           <button
-            onClick={handleOpenQuickView}
-            className="flex items-center justify-center gap-1 border border-black text-black text-[13px] px-3 py-1 hover:bg-black hover:text-white transition-all duration-300"
+            onClick={handleCardClick}
+            className="flex items-center justify-center gap-1 bg-brand-btn text-white text-[11px] font-semibold tracking-wider uppercase px-3 py-1.5 rounded-sm hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer"
           >
-            <ShoppingBag size={13} />
-            <span>Add</span>
+            <ShoppingBag size={12} className="stroke-[2]" />
+            <span>ADD</span>
           </button>
         </div>
       </div>

@@ -30,9 +30,7 @@ export default function App({
   const router = useRouter();
 
   const hideFooterRoutes = [
-    "/auth",
-    "/cart",
-    "/checkout",
+    "/",
     "/order-confirmation",
   ];
   const shouldHideFooter = hideFooterRoutes.some((path) =>
