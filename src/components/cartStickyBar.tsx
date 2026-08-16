@@ -10,7 +10,7 @@ interface CartStickyBarProps {
 }
 
 export const CartStickyBar: React.FC<CartStickyBarProps> = ({ onOpenCart }) => {
-  const { cart, getSelectedItems, getSelectedSubtotal } = useCartStore();
+  const { cart } = useCartStore();
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
@@ -19,9 +19,12 @@ export const CartStickyBar: React.FC<CartStickyBarProps> = ({ onOpenCart }) => {
 
   if (!isHydrated || cart.length === 0) return null;
 
-  const selectedItems = getSelectedItems();
-  const selectedCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = getSelectedSubtotal();
+  // Calculate total count and total value for all items in bag
+  const totalItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalCartPrice = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
 
   return (
     <AnimatePresence>
@@ -31,7 +34,7 @@ export const CartStickyBar: React.FC<CartStickyBarProps> = ({ onOpenCart }) => {
         exit={{ y: 35, opacity: 0, scale: 0.96 }}
         transition={{
           duration: 0.28,
-          ease: [0.16, 1, 0.3, 1], // Apple-style snappy decelerate
+          ease: [0.16, 1, 0.3, 1],
         }}
         className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 sm:w-[380px] z-40 transform-gpu"
       >
@@ -43,7 +46,7 @@ export const CartStickyBar: React.FC<CartStickyBarProps> = ({ onOpenCart }) => {
             <div className="relative">
               <ShoppingBag size={18} className="stroke-[1.7]" />
               <span className="absolute -top-1.5 -right-2 bg-brand-btn text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
-                {selectedCount}
+                {totalItemCount}
               </span>
             </div>
             <span className="text-xs font-semibold tracking-wider uppercase">
@@ -54,7 +57,7 @@ export const CartStickyBar: React.FC<CartStickyBarProps> = ({ onOpenCart }) => {
           <div className="flex items-center gap-2">
             <span className="text-xs text-brand-lightText/70 font-light">Total:</span>
             <span className="text-sm font-semibold tracking-tight">
-              ₹{subtotal.toLocaleString("en-IN")}
+              ₹{totalCartPrice.toLocaleString("en-IN")}
             </span>
           </div>
         </button>
