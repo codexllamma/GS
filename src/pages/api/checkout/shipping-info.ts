@@ -1,132 +1,162 @@
+// pages/api/checkout/shipping-info.ts
+
 import type { NextApiRequest, NextApiResponse } from "next";
 
-// 1. In-Memory Shiprocket Token Cache (Tokens are valid for 10 days)
+// 1. In-Memory Shiprocket Token Cache (Valid for 24h)
 let cachedToken: string | null = null;
-let tokenExpiresAt: number = 0;
+let tokenExpiry = 0;
 
-async function getShiprocketToken(): Promise<string> {
+async function getShiprocketToken(): Promise<string | null> {
   const now = Date.now();
-  if (cachedToken && now < tokenExpiresAt) {
+  if (cachedToken && now < tokenExpiry) {
+    console.log("[SHIPPING-INFO] ⚡ Using cached Shiprocket auth token.");
     return cachedToken;
   }
 
-  const email = process.env.SHIPROCKET_EMAIL;
-  const password = process.env.SHIPROCKET_PASSWORD;
+  const email = process.env.SHIPROCKET_EMAIL || "codexllamma@gmail.com";
+  const password = process.env.SHIPROCKET_PASSWORD || "ObRdh%^Oxj1wtuR8@VPtmxW8DBLkmg*@";
 
-  if (!email || !password) {
-    throw new Error("Shiprocket environment credentials missing.");
-  }
+  console.log(`[SHIPPING-INFO] 🔑 Authenticating with Shiprocket as: ${email}...`);
 
-  const res = await fetch("https://apiv2.shiprocket.in/v1/external/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const data = await res.json();
-  if (!data?.token) {
-    throw new Error(`Shiprocket auth failed: ${data?.message || "Invalid credentials"}`);
-  }
-
-  cachedToken = data.token;
-  // Cache for 24 hours
-  tokenExpiresAt = now + 24 * 60 * 60 * 1000;
-
-  return cachedToken!;
-}
-
-// 2. Default Shipping Methods Helper
-function getDefaultShippingMethods(isServiceable = true, isCodAvailable = true) {
-  const methods = [
-    {
-      id: "prepaid_standard",
-      name: "Standard Delivery (Prepaid)",
-      description: "Delivered in 2-5 business days",
-      serviceable: isServiceable,
-      shipping_fee: 0, // Free
-      cod: false,
-      cod_fee: 0,
-    },
-  ];
-
-  if (isCodAvailable) {
-    methods.push({
-      id: "cod_standard",
-      name: "Cash on Delivery",
-      description: "Pay cash upon delivery",
-      serviceable: isServiceable,
-      shipping_fee: 5000, // ₹50 COD fee in paise
-      cod: true,
-      cod_fee: 0,
+  try {
+    const res = await fetch("https://apiv2.shiprocket.in/v1/external/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
-  }
 
-  return methods;
+    const data = await res.json();
+    if (data?.token) {
+      cachedToken = data.token;
+      tokenExpiry = now + 24 * 60 * 60 * 1000;
+      console.log("[SHIPPING-INFO] ✅ Shiprocket authentication successful. Token cached.");
+      return cachedToken;
+    } else {
+      console.error("[SHIPPING-INFO] ❌ Shiprocket Auth rejected:", data);
+    }
+  } catch (err: any) {
+    console.error("[SHIPPING-INFO] ❌ Shiprocket Auth network exception:", err?.message || err);
+  }
+  return null;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const startTime = Date.now();
+  console.log("\n========================================================");
+  console.log(`[SHIPPING-INFO] 🚀 Incoming Request [${new Date().toISOString()}]`);
+  console.log("[SHIPPING-INFO] Request Body:", JSON.stringify(req.body, null, 2));
+
   if (req.method !== "POST") {
+    console.warn(`[SHIPPING-INFO] ⚠️ Method ${req.method} not allowed.`);
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   const { addresses } = req.body || {};
-  const primaryAddress = addresses?.[0];
-  const targetZipcode = primaryAddress?.zipcode || "410209";
+  const targetZipcode = addresses?.[0]?.zipcode || "410209";
   const pickupPostcode = process.env.SHIPROCKET_PICKUP_PINCODE || "410209";
 
+  // Standard shipping methods (COD = ₹59 -> 5900 paise)
+  const defaultShippingMethods = [
+    {
+      id: "prepaid_standard",
+      name: "Standard Delivery (Prepaid)",
+      description: "Delivered in 2-4 business days",
+      serviceable: true,
+      shipping_fee: 0, // Free shipping
+      cod: false,
+      cod_fee: 0,
+    },
+    {
+      id: "cod_standard",
+      name: "Cash on Delivery",
+      description: "Pay cash upon delivery",
+      serviceable: true,
+      shipping_fee: 5900, // ₹59 in paise
+      cod: true,
+      cod_fee: 0,
+    },
+  ];
+
   try {
-    // 3. Fast Timeout Abort Controller (1.8s cutoff to beat Razorpay's 2.5s timeout)
+    // 1.8s Timeout Controller (Protects against Razorpay's 2.5s gateway drop)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1800);
+    const timeoutId = setTimeout(() => {
+      console.warn("[SHIPPING-INFO] ⏱️ Shiprocket query timed out after 1800ms. Aborting to fallback.");
+      controller.abort();
+    }, 1800);
 
     const token = await getShiprocketToken();
+    let isCodAvailable = true;
 
-    const srRes = await fetch(
-      `https://apiv2.shiprocket.in/v1/external/courier/serviceability/?pickup_postcode=${pickupPostcode}&delivery_postcode=${targetZipcode}&weight=0.5&cod=1&declared_value=1000`,
-      {
+    if (token) {
+      const url = `https://apiv2.shiprocket.in/v1/external/courier/serviceability/?pickup_postcode=${pickupPostcode}&delivery_postcode=${targetZipcode}&weight=0.5&cod=1&declared_value=1000`;
+      console.log(`[SHIPPING-INFO] 📦 Querying Shiprocket Serviceability for Pincode: ${targetZipcode}...`);
+
+      const srRes = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const srData = await srRes.json();
+      console.log("[SHIPPING-INFO] 📦 Raw Shiprocket Serviceability Status:", srRes.status);
+
+      const couriers = srData?.data?.available_courier_companies || [];
+      console.log(`[SHIPPING-INFO] 🚚 Found ${couriers.length} available courier partner(s).`);
+
+      if (couriers.length > 0) {
+        isCodAvailable = couriers.some((c: any) => c.cod === 1);
+        console.log(`[SHIPPING-INFO] 💵 COD Availability on ${targetZipcode}:`, isCodAvailable);
+      } else {
+        console.warn(`[SHIPPING-INFO] ⚠️ No specific couriers returned by Shiprocket for ${targetZipcode}. Defaulting to active delivery.`);
       }
-    );
+    } else {
+      clearTimeout(timeoutId);
+      console.warn("[SHIPPING-INFO] ⚠️ No auth token available. Falling back to default delivery methods.");
+    }
 
-    clearTimeout(timeoutId);
+    const availableMethods = isCodAvailable
+      ? defaultShippingMethods
+      : defaultShippingMethods.filter((m) => !m.cod);
 
-    const srData = await srRes.json();
-    const couriers = srData?.data?.available_courier_companies || [];
-
-    const isServiceable = couriers.length > 0;
-    const isCodAvailable = couriers.some((c: any) => c.cod === 1);
-
-    const shippingMethods = getDefaultShippingMethods(isServiceable, isCodAvailable);
-
-    // 4. Map back maintaining exact incoming address IDs
-    const mappedAddresses = (addresses && addresses.length > 0 ? addresses : [{ id: "0", zipcode: targetZipcode }]).map(
+    const mappedAddresses = (addresses?.length ? addresses : [{ id: "0", zipcode: targetZipcode }]).map(
       (addr: any) => ({
         id: String(addr.id ?? "0"),
         zipcode: addr.zipcode || targetZipcode,
         state_code: addr.state_code || "MH",
         country: addr.country || "IN",
-        shipping_methods: shippingMethods,
+        shipping_methods: availableMethods,
       })
     );
 
-    return res.status(200).json({ addresses: mappedAddresses });
+    const responsePayload = { addresses: mappedAddresses };
+    const elapsedTime = Date.now() - startTime;
+
+    console.log(`[SHIPPING-INFO] ✨ Responding with 200 OK (${elapsedTime}ms):`, JSON.stringify(responsePayload, null, 2));
+    console.log("========================================================\n");
+
+    return res.status(200).json(responsePayload);
   } catch (error: any) {
-    console.warn("Shipping Info fallback triggered:", error?.message || error);
+    const elapsedTime = Date.now() - startTime;
+    console.error(`[SHIPPING-INFO] 🚨 Error encountered (${elapsedTime}ms):`, error?.message || error);
 
-    // 5. Bulletproof Fallback: Guarantees Razorpay always gets a matching ID within ~10ms
-    const fallbackMethods = getDefaultShippingMethods(true, true);
-    const fallbackAddresses = (addresses && addresses.length > 0 ? addresses : [{ id: "0", zipcode: targetZipcode }]).map(
+    // Fallback response guaranteeing strict schema compliance
+    const fallbackAddresses = (addresses?.length ? addresses : [{ id: "0", zipcode: targetZipcode }]).map(
       (addr: any) => ({
         id: String(addr.id ?? "0"),
         zipcode: addr.zipcode || targetZipcode,
         state_code: addr.state_code || "MH",
         country: addr.country || "IN",
-        shipping_methods: fallbackMethods,
+        shipping_methods: defaultShippingMethods,
       })
     );
 
-    return res.status(200).json({ addresses: fallbackAddresses });
+    const fallbackPayload = { addresses: fallbackAddresses };
+    console.log("[SHIPPING-INFO] 🛡️ Returning fallback payload to prevent Magic Checkout freeze:", JSON.stringify(fallbackPayload, null, 2));
+    console.log("========================================================\n");
+
+    return res.status(200).json(fallbackPayload);
   }
 }
