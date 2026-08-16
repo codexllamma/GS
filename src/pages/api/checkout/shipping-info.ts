@@ -1,123 +1,132 @@
-// pages/api/checkout/shipping-info.ts
-
 import type { NextApiRequest, NextApiResponse } from "next";
+
+// 1. In-Memory Shiprocket Token Cache (Tokens are valid for 10 days)
+let cachedToken: string | null = null;
+let tokenExpiresAt: number = 0;
+
+async function getShiprocketToken(): Promise<string> {
+  const now = Date.now();
+  if (cachedToken && now < tokenExpiresAt) {
+    return cachedToken;
+  }
+
+  const email = process.env.SHIPROCKET_EMAIL;
+  const password = process.env.SHIPROCKET_PASSWORD;
+
+  if (!email || !password) {
+    throw new Error("Shiprocket environment credentials missing.");
+  }
+
+  const res = await fetch("https://apiv2.shiprocket.in/v1/external/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await res.json();
+  if (!data?.token) {
+    throw new Error(`Shiprocket auth failed: ${data?.message || "Invalid credentials"}`);
+  }
+
+  cachedToken = data.token;
+  // Cache for 24 hours
+  tokenExpiresAt = now + 24 * 60 * 60 * 1000;
+
+  return cachedToken!;
+}
+
+// 2. Default Shipping Methods Helper
+function getDefaultShippingMethods(isServiceable = true, isCodAvailable = true) {
+  const methods = [
+    {
+      id: "prepaid_standard",
+      name: "Standard Delivery (Prepaid)",
+      description: "Delivered in 2-5 business days",
+      serviceable: isServiceable,
+      shipping_fee: 0, // Free
+      cod: false,
+      cod_fee: 0,
+    },
+  ];
+
+  if (isCodAvailable) {
+    methods.push({
+      id: "cod_standard",
+      name: "Cash on Delivery",
+      description: "Pay cash upon delivery",
+      serviceable: isServiceable,
+      shipping_fee: 5000, // ₹50 COD fee in paise
+      cod: true,
+      cod_fee: 0,
+    });
+  }
+
+  return methods;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
+    res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ message: "Method not allowed" });
   }
 
+  const { addresses } = req.body || {};
+  const primaryAddress = addresses?.[0];
+  const targetZipcode = primaryAddress?.zipcode || "410209";
+  const pickupPostcode = process.env.SHIPROCKET_PICKUP_PINCODE || "410209";
+
   try {
-    const { addresses } = req.body || {};
-    const targetZipcode = addresses?.[0]?.zipcode || "410209";
+    // 3. Fast Timeout Abort Controller (1.8s cutoff to beat Razorpay's 2.5s timeout)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1800);
 
-    // 1. Get credentials safely from environment variables
-    const email = process.env.SHIPROCKET_EMAIL;
-    const password = process.env.SHIPROCKET_PASSWORD;
+    const token = await getShiprocketToken();
 
-    if (!email || !password) {
-      throw new Error("Shiprocket environment credentials missing.");
-    }
-
-    // 2. Authenticate with Shiprocket
-    const authRes = await fetch("https://apiv2.shiprocket.in/v1/external/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const authData = await authRes.json();
-    const token = authData.token;
-
-    if (!token) {
-      throw new Error(`Shiprocket Auth Failed: ${authData.message || JSON.stringify(authData)}`);
-    }
-
-    // 3. Query Courier Serviceability from Shiprocket
-    const pickupPostcode = process.env.SHIPROCKET_PICKUP_PINCODE || "410209";
     const srRes = await fetch(
       `https://apiv2.shiprocket.in/v1/external/courier/serviceability/?pickup_postcode=${pickupPostcode}&delivery_postcode=${targetZipcode}&weight=0.5&cod=1&declared_value=1000`,
       {
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
       }
     );
+
+    clearTimeout(timeoutId);
 
     const srData = await srRes.json();
     const couriers = srData?.data?.available_courier_companies || [];
 
     const isServiceable = couriers.length > 0;
-    const isCodAvailable = couriers.some((courier: any) => courier.cod === 1);
+    const isCodAvailable = couriers.some((c: any) => c.cod === 1);
 
-    // 4. Construct Razorpay Shipping Methods (Amounts in PAISE: ₹50 = 5000)
-    const shippingMethods: any[] = [];
+    const shippingMethods = getDefaultShippingMethods(isServiceable, isCodAvailable);
 
-    // Option 1: Prepaid (Free Shipping)
-    shippingMethods.push({
-      id: "prepaid_standard",
-      name: "Standard Delivery (Prepaid)",
-      description: "Delivered in 2-5 business days",
-      serviceable: isServiceable,
-      shipping_fee: 0, // Displays "FREE" badge
-      cod: false,
-      cod_fee: 0,
-    });
-
-    // Option 2: Cash on Delivery (₹50 COD Fee)
-    if (isCodAvailable) {
-      shippingMethods.push({
-        id: "cod_standard",
-        name: "Cash on Delivery",
-        description: "Pay cash upon delivery",
-        serviceable: isServiceable && isCodAvailable,
-        shipping_fee: 5000, // 5000 paise = ₹50 (Displays "₹50" badge)
-        cod: true,
-        cod_fee: 0,
-      });
-    }
-
-    // 5. Map response for Razorpay
-    const mappedAddresses = (addresses || []).map((addr: any) => ({
-      id: addr.id ?? "0",
-      zipcode: addr.zipcode || targetZipcode,
-      state_code: addr.state_code || "MH",
-      country: "IN",
-      shipping_methods: shippingMethods,
-    }));
+    // 4. Map back maintaining exact incoming address IDs
+    const mappedAddresses = (addresses && addresses.length > 0 ? addresses : [{ id: "0", zipcode: targetZipcode }]).map(
+      (addr: any) => ({
+        id: String(addr.id ?? "0"),
+        zipcode: addr.zipcode || targetZipcode,
+        state_code: addr.state_code || "MH",
+        country: addr.country || "IN",
+        shipping_methods: shippingMethods,
+      })
+    );
 
     return res.status(200).json({ addresses: mappedAddresses });
   } catch (error: any) {
-    console.error("Shipping Info Error:", error);
+    console.warn("Shipping Info fallback triggered:", error?.message || error);
 
-    // Graceful fallback options so Magic Checkout does not fail
-    return res.status(200).json({
-      addresses: [
-        {
-          id: "0",
-          zipcode: "410209",
-          state_code: "MH",
-          country: "IN",
-          shipping_methods: [
-            {
-              id: "prepaid_fallback",
-              name: "Standard Delivery (Prepaid)",
-              description: "Delivered in 2-5 business days",
-              serviceable: true,
-              shipping_fee: 0,
-              cod: false,
-              cod_fee: 0,
-            },
-            {
-              id: "cod_fallback",
-              name: "Cash on Delivery",
-              description: "Pay cash upon delivery",
-              serviceable: true,
-              shipping_fee: 5900, // ₹59
-              cod: true,
-              cod_fee: 0,
-            },
-          ],
-        },
-      ],
-    });
+    // 5. Bulletproof Fallback: Guarantees Razorpay always gets a matching ID within ~10ms
+    const fallbackMethods = getDefaultShippingMethods(true, true);
+    const fallbackAddresses = (addresses && addresses.length > 0 ? addresses : [{ id: "0", zipcode: targetZipcode }]).map(
+      (addr: any) => ({
+        id: String(addr.id ?? "0"),
+        zipcode: addr.zipcode || targetZipcode,
+        state_code: addr.state_code || "MH",
+        country: addr.country || "IN",
+        shipping_methods: fallbackMethods,
+      })
+    );
+
+    return res.status(200).json({ addresses: fallbackAddresses });
   }
 }
