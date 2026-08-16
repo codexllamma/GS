@@ -36,7 +36,8 @@ export default async function handler(
       include: { product: true },
     });
 
-    let totalAmount = 0;
+    let rawSubtotal = 0;
+    let totalQuantity = 0;
     const cartSnapshot: CartSnapshotItem[] = [];
 
     // 2. Validate Stock & Price strictly against DB
@@ -64,7 +65,8 @@ export default async function handler(
           ? dbVariant.price
           : dbVariant.product.basePrice;
 
-      totalAmount += itemPrice * item.quantity;
+      rawSubtotal += itemPrice * item.quantity;
+      totalQuantity += item.quantity;
 
       cartSnapshot.push({
         variantId: dbVariant.id,
@@ -76,62 +78,83 @@ export default async function handler(
       });
     }
 
-    // 3. Create CheckoutSession record matching Prisma schema
+    // 3. Calculate Tiered Volume Discount
+    let discountPercent = 0;
+    if (totalQuantity === 2) {
+      discountPercent = 3;
+    } else if (totalQuantity >= 3) {
+      discountPercent = 5;
+    }
+
+    const discountAmount = Math.round((rawSubtotal * discountPercent) / 100);
+    const finalPayableTotal = Math.max(0, rawSubtotal - discountAmount);
+    const finalAmountInPaise = Math.round(finalPayableTotal * 100);
+
+    // 4. Create CheckoutSession record in DB
     const checkoutSession = await prisma.checkoutSession.create({
       data: {
         userId: userId ?? null,
         pincode: pincode || "",
         cartSnapshot: JSON.parse(JSON.stringify(cartSnapshot)),
-        amount: totalAmount,
+        amount: finalPayableTotal,
         status: "PENDING",
       },
     });
 
-    // 4. Transform items to Razorpay line_items for Magic Checkout (Amounts in Paise)
+    // 5. Build Razorpay Magic Checkout line items with proportionate offer prices
     const lineItems = cartSnapshot.map((item) => {
-      const itemPriceInPaise = Math.round(item.price * 100);
+      const originalPriceInPaise = Math.round(item.price * 100);
+      const discountedPriceInPaise = Math.round(
+        item.price * (1 - discountPercent / 100) * 100
+      );
+
       return {
         sku: item.variantId,
         variant_id: item.variantId,
         name: `${item.productName} (${item.size})`,
-        price: itemPriceInPaise,
-        offer_price: itemPriceInPaise,
+        price: originalPriceInPaise,
+        offer_price: discountedPriceInPaise,
         quantity: item.quantity,
         weight: 500,
       };
     });
 
-    // 5. Create Razorpay Order with Magic Checkout parameters
-    const totalAmountInPaise = Math.round(totalAmount * 100);
-
+    // 6. Create Razorpay Order with Magic Checkout parameters
     const razorpayOrder = await razorpay.orders.create({
-      amount: totalAmountInPaise,
+      amount: finalAmountInPaise,
       currency: "INR",
       receipt: checkoutSession.id,
-      line_items_total: totalAmountInPaise, // Mandatory for Magic Checkout
-      line_items: lineItems,               // Mandatory for Magic Checkout
+      line_items_total: finalAmountInPaise,
+      line_items: lineItems,
       notes: {
         checkoutSessionId: checkoutSession.id,
         userId: userId || "GUEST",
+        discountPercent: `${discountPercent}%`,
+        discountAmount: `₹${discountAmount}`,
         country: "IN",
       },
     } as any);
 
-    // 6. Save razorpayOrderId to CheckoutSession
+    // 7. Save razorpayOrderId to CheckoutSession
     await prisma.checkoutSession.update({
       where: { id: checkoutSession.id },
       data: { razorpayOrderId: razorpayOrder.id },
     });
-
-    console.log("[CHECKOUT SESSION RESPONSE PAYLOAD]:", JSON.stringify(res.json, null, 2));
 
     return res.status(200).json({
       success: true,
       sessionId: checkoutSession.id,
       razorpayOrderId: razorpayOrder.id,
       keyId: process.env.RAZORPAY_KEY_ID,
-      amount: totalAmount,
+      amount: finalPayableTotal,
       currency: "INR",
+      pricing: {
+        subtotal: rawSubtotal,
+        totalQuantity,
+        discountPercent,
+        discountAmount,
+        finalTotal: finalPayableTotal,
+      },
       userPrefill: {
         email: userEmail,
       },

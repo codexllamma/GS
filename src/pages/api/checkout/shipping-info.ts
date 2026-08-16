@@ -111,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               name: "Cash on Delivery",
               description: "Pay cash upon delivery",
               serviceable: true,
-              shipping_fee: 5000, // ₹50
+              shipping_fee: 5900, // ₹59
               cod: true,
               cod_fee: 0,
             },

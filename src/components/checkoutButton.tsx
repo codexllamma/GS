@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { LocalCartItem, useCartStore } from "@/store/useCartStore";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
+import { calculateCartPricing } from "@/lib/pricing";
 
 interface CheckoutButtonProps {
   items: LocalCartItem[];
@@ -21,7 +22,8 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
   const clearPurchasedItems = useCartStore((state) => state.clearPurchasedItems);
   const { data: session } = useSession();
 
-  // Helper to dynamically load the Razorpay SDK script
+  const pricing = calculateCartPricing(items);
+
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
       if (window.Razorpay) {
@@ -44,14 +46,12 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
 
     setLoading(true);
 
-    // --- Analytics Tracking: Initiate Checkout ---
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
+    // Analytics Tracking with Discounted Total
     if (typeof window !== "undefined" && (window as any).fbq) {
       (window as any).fbq("track", "InitiateCheckout", {
         content_ids: items.map((i) => i.productId || i.variantId),
-        num_items: items.reduce((sum, i) => sum + i.quantity, 0),
-        value: subtotal,
+        num_items: pricing.totalQuantity,
+        value: pricing.finalTotal,
         currency: "INR",
       });
     }
@@ -59,7 +59,7 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
     if (typeof window !== "undefined" && (window as any).gtag) {
       (window as any).gtag("event", "begin_checkout", {
         currency: "INR",
-        value: subtotal,
+        value: pricing.finalTotal,
         items: items.map((i) => ({
           item_id: i.productId || i.variantId,
           item_name: i.name,
@@ -71,7 +71,6 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
     }
 
     try {
-      // 1. Ensure Razorpay Script is loaded
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         toast.error("Razorpay SDK failed to load. Are you online?");
@@ -79,7 +78,7 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
         return;
       }
 
-      // 2. Create Checkout Session + Razorpay Order
+      // Backend endpoint creates the session using server-validated prices & discount
       const response = await fetch("/api/checkout/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -94,24 +93,18 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        // Stock Auto-Correction Fallback
         if (data.variantId && typeof data.actualStock === "number") {
           updateQuantity(data.variantId, data.actualStock);
-          toast.error(
-            `Quantity updated to max available stock (${data.actualStock}).`
-          );
+          toast.error(`Quantity updated to max available stock (${data.actualStock}).`);
           return;
         }
-
         throw new Error(data.message || "Failed to create checkout session");
       }
 
-      // 3. Dynamically construct prefill object
       const prefill: Record<string, string> = {};
       if (session?.user?.name) prefill.name = session.user.name;
       if (session?.user?.email) prefill.email = session.user.email;
 
-      // 4. Open Razorpay Magic Checkout Modal
       const options = {
         key: data.keyId,
         order_id: data.razorpayOrderId,
@@ -124,7 +117,6 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
           const toastId = toast.loading("Verifying payment security...");
 
           try {
-            // 1. Call verification endpoint
             const verifyRes = await fetch("/api/razorpay/verify-payment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -139,26 +131,19 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
             const verifyData = await verifyRes.json();
 
             if (!verifyRes.ok || !verifyData.success) {
-              toast.error(verifyData.message || "Payment verification failed.", {
-                id: toastId,
-              });
+              toast.error(verifyData.message || "Payment verification failed.", { id: toastId });
               return;
             }
 
-            // 2. Intelligent Selective Cart Cleanup
             if (Array.isArray(verifyData.purchasedVariantIds)) {
               clearPurchasedItems(verifyData.purchasedVariantIds);
             }
 
             toast.success("Payment verified successfully!", { id: toastId });
-
-            // 3. Redirect to dynamic order confirmation route
             window.location.href = `/order-confirmation/${verifyData.orderId}`;
           } catch (err: any) {
             console.error("Verification error:", err);
-            toast.error("Network error during payment verification.", {
-              id: toastId,
-            });
+            toast.error("Network error during payment verification.", { id: toastId });
           }
         },
         modal: {
@@ -185,7 +170,11 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
       disabled={loading || items.length === 0}
       className="w-full bg-brand-btn text-white text-[11px] font-semibold uppercase tracking-widest py-3.5 rounded-sm hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
     >
-      {loading ? "Opening Razorpay..." : "Proceed to Payment"}
+      {loading ? (
+        "Opening Razorpay..."
+      ) : (
+        <span>Proceed to Payment · ₹{pricing.finalTotal.toLocaleString("en-IN")}</span>
+      )}
     </button>
   );
 };

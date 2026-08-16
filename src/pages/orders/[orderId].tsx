@@ -239,7 +239,7 @@ export default function OrderDetailPage() {
               ) : (
                 <div className="w-full sm:w-auto h-9 px-3 bg-brand-stone/20 text-brand-textSec text-[10px] font-semibold uppercase tracking-widest rounded-sm flex items-center justify-center gap-1.5 select-none">
                   <Clock size={12} />
-                  <span>Awaiting Pickup</span>
+                  <span>To Be Shipped</span>
                 </div>
               )}
 

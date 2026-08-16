@@ -34,6 +34,15 @@ module.exports = {
         rajdhani: ["var(--font-rajdhani)", "system-ui", "sans-serif"],
         saira: ["var(--font-saira)", "system-ui", "sans-serif"],
       },
+      animation: {
+        marquee: "marquee 85s linear infinite",
+      },
+      keyframes: {
+        marquee: {
+          "0%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+      },
     },
   },
   plugins: [],

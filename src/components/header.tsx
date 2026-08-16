@@ -108,9 +108,19 @@ export const Header: React.FC = () => {
   return (
     <>
       {/* ---------------- 1. TOP ANNOUNCEMENT BANNER ---------------- */}
-      <div className="relative z-50 w-full bg-brand-charcoal text-brand-bg text-[9px] xs:text-[10px] sm:text-[11px] tracking-widest uppercase py-1.5 px-4 text-center font-medium truncate select-none">
-        Complimentary shipping on all prepaid orders.
+      {/* ---------------- 1. INFINITE ROTATING ANNOUNCEMENT BANNER ---------------- */}
+{/* ---------------- 1. INFINITE ROTATING ANNOUNCEMENT BANNER ---------------- */}
+<div className="relative z-50 w-full bg-brand-charcoal text-brand-bg text-[9px] xs:text-[10px] sm:text-[11px] tracking-[0.16em] uppercase py-1.5 overflow-hidden select-none whitespace-nowrap">
+  <div className="flex w-max items-center animate-marquee hover:[animation-play-state:paused]">
+    {[...Array(8)].map((_, i) => (
+      <div key={i} className="flex items-center gap-3 px-3 font-medium">
+        <span>2% Off on Prepaid • 3% Off on 2 Items • 5% Off on 3+ Items (Auto applied)</span>
+        <span>2% Off on Prepaid • 3% Off on 2 Items • 5% Off on 3+ Items (Auto applied)</span>
+
       </div>
+    ))}
+  </div>
+</div>
 
       {/* ---------------- 2. STICKY TRANSPARENT NAVBAR ---------------- */}
       <header
@@ -123,36 +133,41 @@ export const Header: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-8 md:px-12 pt-2 sm:pt-0 pb-1.5 sm:pb-2">
           <div className="relative flex items-center justify-between h-13 sm:h-16">
             {/* Left: Brand Logo */}
+            {/* Left: Brand Logo */}
             <div className="flex items-center flex-shrink-0 z-10 pl-1 sm:pl-2">
-              <Link href="/" className="flex items-center">
+              <Link 
+                href="/" 
+                className="flex items-center scale-[0.85] sm:scale-[0.92] origin-left transition-transform"
+              >
                 <AnimatedLogo />
               </Link>
             </div>
 
             {/* Center-Right: Elongated Search Bar */}
-            <div className="absolute top-1/2 left-[54%] sm:left-[53%] -translate-x-1/2 -translate-y-1/2 translate-y-[calc(-50%+4px)] w-[44%] xs:w-[48%] sm:w-[320px] md:w-[420px] lg:w-[500px]">
-              <button
-                onClick={() => setSearchOpen((prev) => !prev)}
-                className={`w-full h-8 sm:h-9 px-3 sm:px-4 border rounded-full flex items-center text-xs transition-all shadow-xs cursor-pointer group ${
-                  searchOpen
-                    ? "bg-white border-brand-charcoal text-brand-charcoal"
-                    : "bg-brand-card/90 hover:bg-white border-brand-border hover:border-brand-charcoal/50 text-brand-textSec"
-                }`}
-                aria-label="Search"
-              >
-                <div className="flex items-center gap-2 w-full truncate">
-                  <Search
-                    size={14}
-                    className="text-brand-textSec group-hover:text-brand-charcoal transition-colors stroke-[1.8] flex-shrink-0"
-                  />
-                  <span className="truncate text-[10px] sm:text-xs text-left">
-                    {searchTerm
-                      ? searchTerm
-                      : "Search for shirts, polos, trousers..."}
-                  </span>
-                </div>
-              </button>
-            </div>
+            {/* Center-Right: Elongated Search Bar */}
+<div className="absolute top-1/2 left-[54%] sm:left-[53%] -translate-x-1/2 -translate-y-1/2 translate-y-[calc(-50%+4px)] w-[44%] xs:w-[48%] sm:w-[320px] md:w-[420px] lg:w-[500px]">
+  <button
+    onClick={() => setSearchOpen((prev) => !prev)}
+    className={`w-full h-8 sm:h-9 px-3 sm:px-4 border rounded-full flex items-center text-xs transition-all shadow-xs cursor-pointer group backdrop-blur-md ${
+      searchOpen
+        ? "bg-white/80 border-brand-charcoal text-brand-charcoal"
+        : "bg-white/20 sm:bg-white/60 hover:bg-white/85 border-brand-border/70 hover:border-brand-charcoal/50 text-brand-textSec"
+    }`}
+    aria-label="Search"
+  >
+    <div className="flex items-center gap-2 w-full truncate">
+      <Search
+        size={14}
+        className="text-brand-textSec group-hover:text-brand-charcoal transition-colors stroke-[1.8] flex-shrink-0"
+      />
+      <span className="truncate text-[10px] sm:text-xs text-left">
+        {searchTerm
+          ? searchTerm
+          : "Search for shirts, polos, trousers..."}
+      </span>
+    </div>
+  </button>
+</div>
 
             {/* Right: Hamburger Menu */}
             <div className="relative flex items-center flex-shrink-0 z-10 translate-x-[0px] translate-y-[4px] sm:translate-x-[0px] sm:translate-y-[0px]">

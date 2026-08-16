@@ -32,9 +32,7 @@ export default function Footer() {
           
           {/* 1. Brand Philosophy */}
           <div className="flex flex-col items-start space-y-4">
-            <span className="font-serif text-xl sm:text-2xl font-normal tracking-[0.2em] text-white uppercase">
-              HIÈR
-            </span>
+            
             <p className="text-xs text-white/70 font-light leading-relaxed max-w-xs">
               Built on the enduring belief that true style never needs to announce itself. Thoughtful design, honest craftsmanship, everyday confidence.
             </p>
