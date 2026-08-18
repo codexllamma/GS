@@ -1,5 +1,4 @@
 import { shopify } from "../client";
-
 import {
   ProductSetInput,
   ProductSetResponse,
@@ -18,23 +17,29 @@ mutation ProductSet(
     product {
       id
       title
-
+      media(first: 10) {
+        nodes {
+          alt
+          ... on MediaImage {
+            image {
+              url
+            }
+          }
+        }
+      }
       variants(first: 100) {
         nodes {
           id
-
           selectedOptions {
-          name
-          value
+            name
+            value
           }
-          
           inventoryItem {
             id
           }
         }
       }
     }
-
     userErrors {
       field
       message
@@ -44,31 +49,28 @@ mutation ProductSet(
 `;
 
 export async function syncShopifyProduct(
-    input: ProductSetInput
-): Promise<ShopifyProduct>{
-  const data =
-    await shopify.graphql<ProductSetResponse>(
-      PRODUCT_SET_MUTATION,
-      {
-        input,
-        synchronous: true,
-      }
-    );
+  input: ProductSetInput
+): Promise<ShopifyProduct> {
+  const data = await shopify.graphql<ProductSetResponse>(
+    PRODUCT_SET_MUTATION,
+    {
+      input,
+      synchronous: true,
+    }
+  );
 
   const result = data.productSet;
 
   if (result.userErrors.length > 0) {
     throw new Error(
       result.userErrors
-        .map((e) => e.message)
+        .map((e) => `${e.field ? `${e.field.join(".")}: ` : ""}${e.message}`)
         .join("\n")
     );
   }
 
   if (!result.product) {
-    throw new Error(
-      "Shopify did not return a product."
-    );
+    throw new Error("Shopify did not return a product.");
   }
 
   return result.product;

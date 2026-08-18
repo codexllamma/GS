@@ -4,7 +4,7 @@ export type ProductAggregate = Prisma.ProductGetPayload<{
   include: {
     variants: true;
     images: true;
-
+    shopifyMapping?: true;
     fabric: {
       include: {
         category: true;
@@ -15,7 +15,6 @@ export type ProductAggregate = Prisma.ProductGetPayload<{
 
 export interface ProductOptionInput {
   name: string;
-
   values: {
     name: string;
   }[];
@@ -34,44 +33,41 @@ export interface InventoryItemInput {
 }
 
 export interface ProductVariantSetInput {
+  sku?: string;
   optionValues: {
     optionName: string;
     name: string;
   }[];
-
   price: string;
-
   inventoryItem?: InventoryItemInput;
 }
 
+export interface FileSetInput {
+  originalSource: string;
+  contentType?: "IMAGE" | "VIDEO" | "MODEL_3D";
+  alt?: string;
+}
+
 export interface ProductSetInput {
+  id?: string;
   title: string;
-
   descriptionHtml: string;
-
   vendor: string;
-
   productType?: string;
-
   status: "ACTIVE" | "DRAFT" | "ARCHIVED";
-
   tags: string[];
-
   giftCard: boolean;
-
   productOptions: ProductOptionInput[];
-
   variants: ProductVariantSetInput[];
+  files?: FileSetInput[];
 }
 
 export interface ShopifyVariant {
   id: string;
-
   selectedOptions: {
     name: string;
     value: string;
   }[];
-
   inventoryItem: {
     id: string;
   };
@@ -79,9 +75,16 @@ export interface ShopifyVariant {
 
 export interface ShopifyProduct {
   id: string;
-
   title: string;
-
+  media?: {
+    nodes: {
+      alt?: string;
+      status?: string;
+      image?: {
+        url: string;
+      };
+    }[];
+  };
   variants: {
     nodes: ShopifyVariant[];
   };
@@ -90,7 +93,6 @@ export interface ShopifyProduct {
 export interface ProductSetResponse {
   productSet: {
     product: ShopifyProduct | null;
-
     userErrors: {
       field: string[];
       message: string;
