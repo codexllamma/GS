@@ -16,16 +16,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // 1. Fetch the specific order
+    // 1. Query the order according to the Prisma schema relations
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
         orderItems: {
           include: {
             variant: {
-              include: {
+              select: {
+                id: true,
+                size: true,
+                price: true,
+                stock: true,
                 product: {
-                  include: { images: true },
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    color: true,
+                    basePrice: true,
+                    fabric: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                    // Fetch images ordered so the primary image appears first
+                    images: {
+                      select: {
+                        id: true,
+                        url: true,
+                        isPrimary: true,
+                      },
+                      orderBy: {
+                        isPrimary: "desc",
+                      },
+                    },
+                  },
                 },
               },
             },
