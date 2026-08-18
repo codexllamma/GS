@@ -6,12 +6,22 @@ import axios from "axios";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Order, OrderItem, Product, Address } from "@/generated/prisma";
+import { Order, OrderItem, Address } from "@/generated/prisma";
 import { useCartStore } from "@/store/useCartStore";
 
 type OrderWithItems = Order & {
   orderItems: (OrderItem & {
-    product: Product & { images: { url: string }[] };
+    variant?: {
+      id: string;
+      size: string;
+      price?: number | null;
+      product?: {
+        id: string;
+        name: string;
+        color?: string;
+        images: { id: string; url: string; isPrimary: boolean }[];
+      };
+    };
   })[];
   address?: Address;
 };
@@ -27,26 +37,28 @@ const OrderConfirmationPage = () => {
   const toggleSelectAll = useCartStore((state) => state.toggleSelectAll);
 
   useEffect(() => {
-  if (!orderId) return;
+    if (!orderId) return;
 
-  const fetchOrder = async () => {
-    try {
-      const res = await axios.get(`/api/orders/${orderId}?intent=confirmation`);
-      setOrder(res.data);
-    } catch (error) {
-      console.error("Error fetching confirmation order:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchOrder = async () => {
+      try {
+        const res = await axios.get(`/api/orders/${orderId}?intent=confirmation`);
+        setOrder(res.data);
+      } catch (error) {
+        console.error("Error fetching confirmation order:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchOrder();
-}, [orderId]);
+    fetchOrder();
+  }, [orderId]);
 
   // Post-Checkout Cart Reset Logic
   useEffect(() => {
     if (order?.orderItems && order.orderItems.length > 0) {
-      const purchasedVariantIds = order.orderItems.map((item) => item.variantId);
+      const purchasedVariantIds = order.orderItems
+        .map((item) => item.variantId)
+        .filter(Boolean) as string[];
 
       // 1. Remove paid items from the persistent cart store
       clearPurchasedItems(purchasedVariantIds);
@@ -63,7 +75,9 @@ const OrderConfirmationPage = () => {
     // Meta Pixel: Purchase
     if (typeof window !== "undefined" && (window as any).fbq) {
       (window as any).fbq("track", "Purchase", {
-        content_ids: order.orderItems.map((item) => item.productId || item.variantId),
+        content_ids: order.orderItems.map(
+          (item) => item.variant?.product?.id || item.variantId
+        ),
         content_type: "product",
         value: order.total,
         currency: "INR",
@@ -78,8 +92,8 @@ const OrderConfirmationPage = () => {
         value: order.total,
         currency: "INR",
         items: order.orderItems.map((item) => ({
-          item_id: item.productId || item.variantId,
-          item_name: item.product?.name,
+          item_id: item.variant?.product?.id || item.variantId,
+          item_name: item.variant?.product?.name || "Product",
           price: item.priceAtPurchase,
           quantity: item.quantity,
         })),
@@ -187,31 +201,40 @@ const OrderConfirmationPage = () => {
             Items in Your Order ({order.orderItems.length})
           </h2>
           <div className="space-y-3">
-            {order.orderItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between bg-brand-stone/20 border border-brand-border rounded-sm p-3.5"
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <img
-                    src={item.product?.images?.[0]?.url || "/placeholder.png"}
-                    alt={item.product?.name || "Product"}
-                    className="w-14 h-16 rounded-sm object-cover object-top border border-brand-border bg-white flex-shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <p className="font-serif text-xs sm:text-sm font-medium text-brand-charcoal truncate">
-                      {item.product?.name}
-                    </p>
-                    <p className="text-[11px] text-brand-textSec mt-0.5">
-                      Qty: {item.quantity} · ₹{item.priceAtPurchase.toLocaleString("en-IN")} each
-                    </p>
+            {order.orderItems.map((item) => {
+              const product = item.variant?.product;
+              const primaryImage =
+                product?.images?.find((img) => img.isPrimary)?.url ||
+                product?.images?.[0]?.url ||
+                "/placeholder.png";
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between bg-brand-stone/20 border border-brand-border rounded-sm p-3.5"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <img
+                      src={primaryImage}
+                      alt={product?.name || "Product image"}
+                      className="w-14 h-16 rounded-sm object-cover object-top border border-brand-border bg-white flex-shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-serif text-xs sm:text-sm font-medium text-brand-charcoal truncate">
+                        {product?.name || "Ordered Item"}
+                      </p>
+                      <p className="text-[11px] text-brand-textSec mt-0.5">
+                        {item.variant?.size && `Size: ${item.variant.size} · `}
+                        Qty: {item.quantity} · ₹{item.priceAtPurchase.toLocaleString("en-IN")} each
+                      </p>
+                    </div>
                   </div>
+                  <p className="font-medium text-xs sm:text-sm text-brand-charcoal flex-shrink-0 ml-3">
+                    ₹{(item.quantity * item.priceAtPurchase).toLocaleString("en-IN")}
+                  </p>
                 </div>
-                <p className="font-medium text-xs sm:text-sm text-brand-charcoal flex-shrink-0 ml-3">
-                  ₹{(item.quantity * item.priceAtPurchase).toLocaleString("en-IN")}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
