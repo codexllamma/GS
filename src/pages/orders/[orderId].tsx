@@ -80,24 +80,31 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!orderId) return;
+  if (!orderId) return;
 
-    const fetchOrder = async () => {
-      try {
-        const res = await fetch(`/api/orders/${orderId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOrder(data);
-        }
-      } catch (error) {
-        console.error("Error fetching order details:", error);
-      } finally {
-        setLoading(false);
+  const fetchOrder = async () => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`);
+      
+      if (res.status === 401 || res.status === 403) {
+        // Optional: Redirect to login or unauthorized page
+        console.warn("Unauthorized access to order details.");
+        return;
       }
-    };
 
-    fetchOrder();
-  }, [orderId]);
+      if (res.ok) {
+        const data = await res.json();
+        setOrder(data);
+      }
+    } catch (error) {
+      console.error("Error fetching order details:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchOrder();
+}, [orderId]);
 
   const isReturnEligible = () => {
     if (!order) return false;

@@ -27,21 +27,21 @@ const OrderConfirmationPage = () => {
   const toggleSelectAll = useCartStore((state) => state.toggleSelectAll);
 
   useEffect(() => {
-    if (!orderId) return;
+  if (!orderId) return;
 
-    const fetchOrder = async () => {
-      try {
-        const res = await axios.get(`/api/orders/${orderId}`);
-        setOrder(res.data);
-      } catch (error) {
-        console.error("Error fetching order:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchOrder = async () => {
+    try {
+      const res = await axios.get(`/api/orders/${orderId}?intent=confirmation`);
+      setOrder(res.data);
+    } catch (error) {
+      console.error("Error fetching confirmation order:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchOrder();
-  }, [orderId]);
+  fetchOrder();
+}, [orderId]);
 
   // Post-Checkout Cart Reset Logic
   useEffect(() => {
