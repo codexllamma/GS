@@ -12,6 +12,8 @@ import {
   Shirt,
   ShieldCheck,
   Smile,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { AnimatePresence, motion, useMotionValue, animate } from "framer-motion";
 import toast from "react-hot-toast";
@@ -85,6 +87,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       damping: 35,
       mass: 0.5,
     });
+  };
+
+  const handlePrev = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (currentImage > 0) slideToIndex(currentImage - 1);
+  };
+
+  const handleNext = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const imagesCount = product?.images?.length ?? 0;
+    if (currentImage < imagesCount - 1) slideToIndex(currentImage + 1);
   };
 
   const handleDragStart = () => {
@@ -474,53 +487,42 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                   )}
 
-                  {/* Dash & Dot Overlay Indicator */}
+                  {/* Dash & Dot Overlay Indicator & Navigation Arrows */}
                   {images.length > 1 && (
-                    <div className="absolute bottom-2.5 inset-x-0 flex justify-center items-center space-x-1.5 pointer-events-none z-10">
-                      {images.map((_, i) => (
-                        <span
-                          key={i}
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            currentImage === i
-                              ? "w-4 bg-brand-btn shadow-sm"
-                              : "w-1.5 bg-brand-btn/30"
-                          }`}
-                        />
-                      ))}
-                    </div>
+                    <>
+                      <div className="absolute bottom-2.5 inset-x-0 flex justify-center items-center space-x-1.5 pointer-events-none z-10">
+                        {images.map((_, i) => (
+                          <span
+                            key={i}
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                              currentImage === i
+                                ? "w-4 bg-brand-btn shadow-sm"
+                                : "w-1.5 bg-brand-btn/30"
+                            }`}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Navigation Arrows */}
+                      <button
+                        onClick={handlePrev}
+                        disabled={currentImage === 0}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1.5 sm:p-2 bg-white/50 hover:bg-white/80 backdrop-blur-sm text-brand-charcoal rounded-full opacity-80 hover:opacity-100 transition-all shadow-sm disabled:opacity-0 disabled:pointer-events-none cursor-pointer z-10"
+                        aria-label="Previous image"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button
+                        onClick={handleNext}
+                        disabled={currentImage === images.length - 1}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 sm:p-2 bg-white/50 hover:bg-white/80 backdrop-blur-sm text-brand-charcoal rounded-full opacity-80 hover:opacity-100 transition-all shadow-sm disabled:opacity-0 disabled:pointer-events-none cursor-pointer z-10"
+                        aria-label="Next image"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </>
                   )}
                 </div>
-
-                {/* Bottom Thumbnail Strip */}
-                {images.length > 1 && (
-                  <div className="w-full max-w-[360px] sm:max-w-[400px] md:max-w-none mx-auto mt-3.5 flex items-center justify-center gap-2 overflow-x-auto py-1 px-1 [&::-webkit-scrollbar]:hidden">
-                    {images.map((img, idx) => {
-                      const isActive = currentImage === idx;
-                      const url = getSafeUrl(img.url) || "https://placehold.co/600x800/png?text=No+Image";
-                      return (
-                        <button
-                          key={img.id || idx}
-                          type="button"
-                          onClick={() => slideToIndex(idx)}
-                          className={`relative aspect-[4/5] w-11 sm:w-12 rounded-sm overflow-hidden border transition-all duration-200 flex-shrink-0 cursor-pointer ${
-                            isActive
-                              ? "border-brand-charcoal ring-1 ring-brand-charcoal scale-105 shadow-sm"
-                              : "border-brand-border/80 opacity-60 hover:opacity-100 hover:border-brand-textSec"
-                          }`}
-                        >
-                          <Image
-                            src={url}
-                            alt={`Thumbnail ${idx + 1}`}
-                            fill
-                            unoptimized={true}
-                            className="object-cover object-top"
-                            sizes="60px"
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
 
               {/* ---------------- RIGHT: DETAILS & ACTIONS ---------------- */}
