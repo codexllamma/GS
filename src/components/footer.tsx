@@ -40,7 +40,7 @@ export default function Footer() {
             {/* Social Channels */}
             <div className="flex items-center gap-2.5 pt-2">
               <motion.a
-                href="https://www.instagram.com"
+                href="https://www.instagram.com/hier_society"
                 target="_blank"
                 rel="noreferrer"
                 whileHover={{ scale: 1.05 }}
