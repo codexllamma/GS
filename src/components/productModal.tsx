@@ -78,6 +78,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     if (!imageContainerRef.current) return;
     const width = imageContainerRef.current.offsetWidth;
     setCurrentImage(index);
+    // This creates the smooth swipe animation when clicking a thumbnail
     animate(x, -index * width, {
       type: "spring",
       stiffness: 350,
@@ -423,11 +424,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             </div>
           ) : (
             <>
-              {/* ---------------- LEFT: SPRING SWIPE CAROUSEL ---------------- */}
-              <div className="w-full md:w-[42%] bg-brand-card flex flex-col items-center justify-center p-3.5 sm:p-5 border-b md:border-b-0 md:border-r border-brand-border flex-shrink-0">
+              {/* ---------------- LEFT: SPRING SWIPE CAROUSEL & THUMBNAILS ---------------- */}
+              <div className="w-full md:w-[42%] bg-brand-card flex flex-col justify-center p-3.5 sm:p-5 border-b md:border-b-0 md:border-r border-brand-border flex-shrink-0">
+                {/* Main Swipeable Stage */}
                 <div
                   ref={imageContainerRef}
-                  className="relative block w-full max-w-[290px] sm:max-w-[320px] md:max-w-none aspect-[4/5] overflow-hidden rounded-sm bg-brand-stone/30 mx-auto touch-pan-y select-none"
+                  className="relative block w-full max-w-[360px] sm:max-w-[400px] md:max-w-none aspect-[4/5] overflow-hidden rounded-sm bg-brand-stone/30 mx-auto touch-pan-y select-none"
                 >
                   {images.length > 0 ? (
                     <motion.div
@@ -488,6 +490,37 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* Bottom Thumbnail Strip */}
+                {images.length > 1 && (
+                  <div className="w-full max-w-[360px] sm:max-w-[400px] md:max-w-none mx-auto mt-3.5 flex items-center justify-center gap-2 overflow-x-auto py-1 px-1 [&::-webkit-scrollbar]:hidden">
+                    {images.map((img, idx) => {
+                      const isActive = currentImage === idx;
+                      const url = getSafeUrl(img.url) || "https://placehold.co/600x800/png?text=No+Image";
+                      return (
+                        <button
+                          key={img.id || idx}
+                          type="button"
+                          onClick={() => slideToIndex(idx)}
+                          className={`relative aspect-[4/5] w-11 sm:w-12 rounded-sm overflow-hidden border transition-all duration-200 flex-shrink-0 cursor-pointer ${
+                            isActive
+                              ? "border-brand-charcoal ring-1 ring-brand-charcoal scale-105 shadow-sm"
+                              : "border-brand-border/80 opacity-60 hover:opacity-100 hover:border-brand-textSec"
+                          }`}
+                        >
+                          <Image
+                            src={url}
+                            alt={`Thumbnail ${idx + 1}`}
+                            fill
+                            unoptimized={true}
+                            className="object-cover object-top"
+                            sizes="60px"
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* ---------------- RIGHT: DETAILS & ACTIONS ---------------- */}
