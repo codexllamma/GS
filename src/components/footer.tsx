@@ -25,13 +25,13 @@ const QUICK_LINKS = [
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-brand-charcoal text-brand-bg pt-12 sm:pt-14 pb-6 sm:pb-8 px-5 sm:px-10 md:px-16 border-t border-brand-charcoal">
-      <div className="max-w-7xl mx-auto">
+    <footer className="w-full bg-brand-charcoal text-brand-bg pt-8 sm:pt-14 pb-32 sm:pb-8 px-5 sm:px-10 md:px-16 border-t border-brand-charcoal min-h-[calc(100dvh-4rem)] flex flex-col justify-between">
+      <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
         {/* Main Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 pb-10 border-b border-white/10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-10 lg:gap-12 pb-6 sm:pb-10 border-b border-white/10 flex-1">
           
           {/* 1. Brand Philosophy */}
-          <div className="flex flex-col items-start space-y-4">
+          <div className="flex flex-col items-start space-y-3 sm:space-y-4">
             
             <p className="text-xs text-white/70 font-light leading-relaxed max-w-xs">
               Built on the enduring belief that true style never needs to announce itself. Thoughtful design, honest craftsmanship, everyday confidence.
@@ -67,10 +67,10 @@ export default function Footer() {
 
           {/* 2. Subtly Interactive Quick Links */}
           <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/90 mb-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/90 mb-3 sm:mb-4">
               Client Service
             </h3>
-            <ul className="space-y-2.5">
+            <ul className="space-y-2 sm:space-y-2.5">
               {QUICK_LINKS.map((link) => (
                 <li key={link.path}>
                   <Link
@@ -93,10 +93,10 @@ export default function Footer() {
 
           {/* 3. Concierge / Contact */}
           <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/90 mb-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/90 mb-3 sm:mb-4">
               Concierge
             </h3>
-            <ul className="space-y-3.5 text-xs text-white/75 font-light">
+            <ul className="space-y-2.5 sm:space-y-3.5 text-xs text-white/75 font-light">
               <li>
                 <a
                   href="mailto:support@hièr.store"
@@ -123,7 +123,7 @@ export default function Footer() {
           </div>
 
           {/* 4. Trust & Security */}
-          <div>
+          <div className="hidden sm:block">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/90 mb-4">
               Integrity
             </h3>
@@ -143,7 +143,7 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-white/40 font-light">
+        <div className="pt-6 mt-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-white/40 font-light">
           <p>© {new Date().getFullYear()} THKR Futuretech Pvt. Ltd. All rights reserved.</p>
           <span className="tracking-widest uppercase text-[10px] text-white/30">
             Handcrafted with precision in India

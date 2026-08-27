@@ -115,14 +115,15 @@ export default function App({
 
       <ClientHydrationWrapper>
         {/* Side-effects and session/cart sync */}
+        <div className="min-h-screen flex flex-col bg-brand-bg text-brand-charcoal">
+          {/* Actual page */}
+          <main className="flex-grow flex flex-col">
+            <Component {...pageProps} />
+          </main>
+          <Toaster position="top-center" />
+          {/* Global Auth Modal */}
 
-        {/* Actual page */}
-        <Component {...pageProps} />
-        <Toaster position="top-center" />
-        {/* Global Auth Modal */}
-
-        {/* Footer */}
-        <div className="mt-10">
+          {/* Footer */}
           {!shouldHideFooter && <Footer />}
         </div>
       </ClientHydrationWrapper>

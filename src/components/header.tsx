@@ -130,11 +130,10 @@ export const Header: React.FC = () => {
             : "bg-transparent border-b border-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 md:px-12 pt-2 sm:pt-0 pb-1.5 sm:pb-2">
-          <div className="relative flex items-center justify-between h-13 sm:h-16">
+        <div className="max-w-7xl mx-auto px-5 sm:px-10 md:px-16">
+          <div className="relative flex items-center justify-between h-16">
             {/* Left: Brand Logo */}
-            {/* Left: Brand Logo */}
-            <div className="flex items-center flex-shrink-0 z-10 pl-1 sm:pl-2">
+            <div className="flex items-center flex-shrink-0 z-10">
               <Link 
                 href="/" 
                 className="flex items-center scale-[0.85] sm:scale-[0.92] origin-left transition-transform"
