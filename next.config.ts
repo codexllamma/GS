@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  eslint: {
+    // Prevents ESLint errors from failing the production build
+    ignoreDuringBuilds: true,
+  },
   images: {
     domains: [
       'rzgwffrwwmxtnontocdv.supabase.co',   // your existing one

@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { useAuthModal } from "@/store/useAuthModal";
+import toast from "react-hot-toast"; // <-- ADDED: Fixes the crash on handleCheckout
 
 interface LocalCartItem {
   variantId: string;
@@ -16,7 +17,7 @@ export default function CheckoutPage() {
   const { open: openAuthModal } = useAuthModal();
 
   const [cartItems, setCartItems] = useState<any[]>([]);
-  const [pincode, setPincode] = useState("110001");
+  const [pincode, setPincode] = useState(""); // Cleared the hardcoded "110001"
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -70,7 +71,7 @@ export default function CheckoutPage() {
           setCartItems(hydratedCart);
         }
       } catch (e) {
-
+        console.error("Failed to load cart", e);
       } finally {
         setLoading(false);
       }
@@ -92,8 +93,8 @@ export default function CheckoutPage() {
     });
     
   const handleCheckout = async () => {
-    if (!pincode || pincode.trim().length === 0) {
-      toast.error("Please enter a valid PIN code.");
+    if (!pincode || pincode.trim().length !== 6) {
+      toast.error("Please enter a valid 6-digit PIN code.");
       return;
     }
 
@@ -136,8 +137,8 @@ export default function CheckoutPage() {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: data.razorpayOrder.amount,
         currency: data.razorpayOrder.currency,
-        name: "Your Store Name",
-        description: "Order Checkout",
+        name: "HIÈR",
+        description: "Bespoke Menswear",
         order_id: data.razorpayOrder.id,
 
         handler: async () => {
@@ -164,7 +165,7 @@ export default function CheckoutPage() {
           : undefined,
 
         theme: {
-          color: "#000000",
+          color: "#1A1C1E", // brand-charcoal
         },
       };
 
@@ -181,7 +182,7 @@ export default function CheckoutPage() {
      =============================== */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-neutral-500">
+      <div className="min-h-screen flex items-center justify-center bg-brand-bg text-brand-textSec text-sm tracking-widest uppercase">
         Loading checkout…
       </div>
     );
@@ -198,37 +199,37 @@ export default function CheckoutPage() {
   );
 
   /* ===============================
-     UI
+     UI (Updated to HIÈR Design System)
      =============================== */
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-brand-bg text-brand-charcoal font-sans">
       <div className="max-w-7xl mx-auto px-6 py-12">
         <button
           onClick={() => router.push("/")}
-          className="flex items-center text-sm text-neutral-600 mb-6 cursor-pointer hover:text-black transition"
+          className="flex items-center text-xs tracking-wider uppercase text-brand-textSec mb-8 cursor-pointer hover:text-brand-charcoal transition"
         >
-          <ArrowLeft size={16} className="mr-2" /> Back to Shopping
+          <ArrowLeft size={14} className="mr-2" /> Back to Shopping
         </button>
 
-        <div className="flex items-center justify-between mb-10">
-          <h1 className="text-3xl font-light">Checkout</h1>
+        <div className="flex items-center justify-between mb-10 pb-4 border-b border-brand-border">
+          <h1 className="text-2xl font-serif tracking-widest uppercase">Checkout</h1>
 
           {status !== "authenticated" && (
             <button
               onClick={() => openAuthModal()}
-              className="text-sm text-neutral-600 underline hover:text-black"
+              className="text-xs uppercase tracking-wider text-brand-textSec hover:text-brand-charcoal transition"
             >
-              Have an account? Sign in
+              Have an account? <span className="underline">Sign in</span>
             </button>
           )}
         </div>
 
         {cartItems.length === 0 ? (
-          <div className="bg-white p-12 text-center rounded-xl border">
-            <p className="text-neutral-500 mb-4">Your cart is empty.</p>
+          <div className="bg-brand-card p-12 text-center rounded-sm border border-brand-border">
+            <p className="text-brand-textSec mb-6 text-sm">Your cart is empty.</p>
             <button
               onClick={() => router.push("/")}
-              className="bg-black text-white px-6 py-2 rounded text-sm"
+              className="bg-brand-btn text-white px-8 py-3 rounded-sm text-xs tracking-widest uppercase hover:bg-brand-charcoal/90 transition"
             >
               Continue Shopping
             </button>
@@ -236,65 +237,67 @@ export default function CheckoutPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-10">
             {/* LEFT */}
-            <div className="space-y-8">
-              <section className="bg-white p-6 rounded-xl border">
-                <h2 className="text-lg font-medium mb-2">Delivery PIN Code</h2>
-                <p className="text-xs text-neutral-500 mb-4">
-                  Enter your PIN code to verify serviceability. Address details will be collected during payment.
+            <div className="space-y-6">
+              <section className="bg-brand-card p-6 rounded-sm border border-brand-border">
+                <h2 className="font-serif text-sm tracking-widest uppercase mb-2">Delivery Details</h2>
+                <p className="text-xs text-brand-textSec mb-6 leading-relaxed">
+                  Enter your PIN code to verify serviceability. Full address details will be collected securely during payment.
                 </p>
 
                 <input
                   type="text"
                   placeholder="Enter 6-digit PIN code *"
                   value={pincode}
-                  onChange={(e) => setPincode(e.target.value)}
-                  className="border p-3 rounded w-full max-w-xs"
+                  onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))} // Strips non-numeric chars
+                  className="border border-brand-border p-3.5 rounded-sm w-full max-w-xs text-sm focus:outline-none focus:border-brand-charcoal transition-colors bg-brand-bg"
                   maxLength={6}
                 />
               </section>
 
-              <section className="bg-white p-6 rounded-xl border">
-                <h2 className="text-lg font-medium mb-2">Express Checkout</h2>
-                <p className="text-sm text-neutral-500 mb-6">
+              <section className="bg-brand-card p-6 rounded-sm border border-brand-border">
+                <h2 className="font-serif text-sm tracking-widest uppercase mb-2">Express Checkout</h2>
+                <p className="text-xs text-brand-textSec mb-6 leading-relaxed">
                   Address collection and payment choices (UPI, Cards, COD) are managed securely by Razorpay Magic Checkout.
                 </p>
 
                 <motion.button
-                  whileTap={{ scale: 0.98 }}
+                  whileTap={{ scale: 0.99 }}
                   disabled={isSubmitting}
                   onClick={handleCheckout}
-                  className="w-full bg-black text-white py-3.5 rounded font-medium disabled:opacity-50 cursor-pointer"
+                  className="w-full bg-brand-btn text-white py-4 rounded-sm text-xs tracking-widest uppercase disabled:opacity-50 cursor-pointer hover:bg-brand-charcoal/90 transition"
                 >
-                  {isSubmitting ? "Processing..." : "Proceed to Magic Checkout"}
+                  {isSubmitting ? "Processing..." : "Proceed to Payment"}
                 </motion.button>
               </section>
             </div>
 
             {/* RIGHT */}
-            <aside className="bg-white p-6 rounded-xl border h-fit">
-              <h2 className="text-lg font-medium mb-4">Order Summary</h2>
+            <aside className="bg-brand-card p-6 rounded-sm border border-brand-border h-fit sticky top-24">
+              <h2 className="font-serif text-sm tracking-widest uppercase mb-6 pb-4 border-b border-brand-border">
+                Order Summary
+              </h2>
 
-              {cartItems.map((item, idx) => (
-                <div key={item.id || idx} className="flex justify-between mb-3 text-sm">
-                  <span>
-                    {item.variant?.product?.name || "Product"} ({item.variant?.size}) × {item.quantity}
-                  </span>
-                  <span>
-                    ₹
-                    {(
-                      item.quantity *
-                      (item.variant?.price ??
-                        item.variant?.product?.basePrice ??
-                        0)
-                    ).toLocaleString()}
-                  </span>
-                </div>
-              ))}
+              <div className="space-y-4 mb-6">
+                {cartItems.map((item, idx) => (
+                  <div key={item.id || idx} className="flex justify-between text-sm">
+                    <span className="text-brand-charcoal">
+                      {item.variant?.product?.name || "Product"} <span className="text-brand-textSec text-xs">({item.variant?.size})</span> <span className="text-xs text-brand-textSec mx-1">×</span> {item.quantity}
+                    </span>
+                    <span className="font-medium">
+                      ₹
+                      {(
+                        item.quantity *
+                        (item.variant?.price ??
+                          item.variant?.product?.basePrice ??
+                          0)
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
 
-              <hr className="my-4" />
-
-              <div className="flex justify-between font-medium text-base">
-                <span>Total</span>
+              <div className="flex justify-between font-medium text-base pt-4 border-t border-brand-border">
+                <span className="font-serif uppercase tracking-widest text-sm">Total</span>
                 <span>₹{total.toLocaleString()}</span>
               </div>
             </aside>

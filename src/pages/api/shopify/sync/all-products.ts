@@ -26,10 +26,6 @@ export default async function handler(
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-
-
-
-
   const startTime = Date.now();
 
   try {
@@ -50,7 +46,6 @@ export default async function handler(
     const total = products.length;
 
     if (total === 0) {
-
       return res.status(200).json({
         success: true,
         message: "No active products found in the database to sync.",
@@ -60,7 +55,7 @@ export default async function handler(
       });
     }
 
-to synchronize.\n`);
+    console.log(`Starting bulk sync: ${total} products to synchronize.\n`);
 
     const successes: SyncSuccess[] = [];
     const failures: SyncFailure[] = [];
@@ -70,7 +65,7 @@ to synchronize.\n`);
       const { id, name } = products[i];
       const progress = `[${i + 1}/${total}]`;
 
-...`);
+      console.log(`${progress} Syncing "${name}"...`);
 
       try {
         const shopifyProduct = await syncProduct(id);
@@ -106,24 +101,17 @@ to synchronize.\n`);
 
     // 3. Terminal Summary Report
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-
-
-
-
-
-
-
-
+    console.log(`\n=== SYNC COMPLETE IN ${duration}s ===`);
+    console.log(`Total: ${total} | Success: ${successes.length} | Failed: ${failures.length}`);
 
     if (failures.length > 0) {
-
+      console.log("\nFailed Items:");
       failures.forEach((f, idx) => {
         console.log(
           `   ${idx + 1}. [${f.id}] "${f.name}"\n     Reason: ${f.error}`
         );
       });
     }
-
 
     // 4. Return HTTP Response
     return res.status(200).json({

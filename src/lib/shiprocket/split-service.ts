@@ -47,6 +47,7 @@ export async function executeOrderSplit(internalOrderId: string) {
   const existingShipments = await prisma.shipment.findMany({
     where: { orderId: internalOrderId },
   });
+  
   if (existingShipments.length > 0) {
     return { success: true, message: "Order is already processed.", shipments: existingShipments };
   }
@@ -64,7 +65,7 @@ export async function executeOrderSplit(internalOrderId: string) {
     for (let q = 0; q < item.quantity; q++) {
       expandedUnits.push({
         orderItemId: item.id,
-        name: item.product?.name || "Product Item",
+        name: item.product.name,
         sku: item.variantId,
         price: item.priceAtPurchase,
       });
@@ -84,7 +85,9 @@ export async function executeOrderSplit(internalOrderId: string) {
   const pincode = order.address?.postal || "000000";
   const email = order.user?.email || "customer@example.com";
   const phone = order.user?.phoneNumber || "9999999999";
-  const paymentMethod = order.paymentMethod?.toUpperCase() === "COD" ? "COD" : "Prepaid";
+  
+  // Validating against ENUM 'PaymentMethod' (COD or RAZORPAY)
+  const paymentMethod = order.paymentMethod === "COD" ? "COD" : "Prepaid";
   const pickupLocation = process.env.SHIPROCKET_PICKUP_LOCATION || "Home";
 
   const createdShipments = [];
@@ -215,9 +218,9 @@ export async function executeOrderSplit(internalOrderId: string) {
         body: JSON.stringify({ ids: toCancelIds }),
       });
       const cancelData = await cancelRes.json();
-${toCancelIds.join(", ")}:`, cancelData);
+      console.log(`Cancelled orders ${toCancelIds.join(", ")}:`, cancelData);
     } else {
-
+      console.log("No master orders required cancellation.");
     }
   } catch (e) {
     console.warn("[SHIPROCKET MASTER CLEANUP WARN]: Master order cancellation skipped.", e);
