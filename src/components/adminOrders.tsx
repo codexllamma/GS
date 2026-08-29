@@ -20,6 +20,7 @@ import {
   MapPin,
   CreditCard,
   Building,
+  X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -79,6 +80,27 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // --- PROGRESS MODAL STATE ---
+  const [progressModal, setProgressModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    progress: number;
+    total: number;
+    logs: { message: string; type: "info" | "success" | "error" }[];
+    isFinished: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    progress: 0,
+    total: 0,
+    logs: [],
+    isFinished: false,
+  });
+
+  const addLog = (message: string, type: "info" | "success" | "error" = "info") => {
+    setProgressModal(prev => ({ ...prev, logs: [...prev.logs, { message, type }] }));
+  };
 
   // --- 1. FETCH ORDERS ---
   const fetchOrders = async () => {
@@ -143,98 +165,171 @@ export default function AdminOrders() {
   };
 
   const handleBatchSplit = async () => {
-    if (!confirm("Run auto-split and flyer dimension setup for all unprocessed orders placed today?")) return;
-    setProcessingId("BATCH_SPLIT");
-    try {
-      const res = await fetch("/api/admin/orders/batch-split", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        alert(
-          `Batch Split Complete!\nTotal Evaluated: ${data.results?.total || 0}\nProcessed: ${data.results?.processed || 0}\nFailed: ${data.results?.failed || 0}`
-        );
-        fetchOrders();
-      } else {
-        alert(`Batch Split Error: ${data.message}`);
-      }
-    } catch (err) {
-      alert("Failed to execute batch split.");
-    } finally {
-      setProcessingId(null);
+    const pendingOrders = orders.filter(o => o.shipments.length === 0);
+    if (pendingOrders.length === 0) {
+      alert("No pending orders require splitting.");
+      return;
     }
+    if (!confirm(`Run auto-split for ${pendingOrders.length} orders?`)) return;
+
+    setProcessingId("BATCH_SPLIT");
+    setProgressModal({ isOpen: true, title: "Batch Splitting Orders", progress: 0, total: pendingOrders.length, logs: [], isFinished: false });
+    
+    let processed = 0;
+    let totalSplits = 0;
+    
+    for (let i = 0; i < pendingOrders.length; i++) {
+      const order = pendingOrders[i];
+      addLog(`[${i+1}/${pendingOrders.length}] Splitting Order: ${order.id}...`);
+      try {
+        const res = await fetch(`/api/admin/orders/${order.id}/split`, { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+          processed++;
+          const newSplits = data.shipments?.length || 0;
+          totalSplits += newSplits;
+          addLog(`✅ Order ${order.id} split into ${newSplits} packages.`, "success");
+        } else {
+          addLog(`❌ Failed ${order.id}: ${data.message}`, "error");
+        }
+      } catch (err: any) {
+        addLog(`❌ Failed ${order.id}: ${err.message}`, "error");
+      }
+      setProgressModal(prev => ({ ...prev, progress: i + 1 }));
+    }
+    
+    addLog(`✨ Finished! Created ${totalSplits} total splits from ${processed} orders.`, "success");
+    setProgressModal(prev => ({ ...prev, isFinished: true }));
+    setProcessingId(null);
+    fetchOrders();
+  };
+
+  const handleBatchAssignAwb = async () => {
+    const pendingShipments = orders.flatMap(o => o.shipments.filter(s => !s.awbCode));
+    if (pendingShipments.length === 0) {
+      alert("No pending shipments require AWB assignment.");
+      return;
+    }
+    if (!confirm(`Assign AWBs for ${pendingShipments.length} shipments?`)) return;
+
+    setProcessingId("BATCH_AWB");
+    setProgressModal({ isOpen: true, title: "Batch Assigning AWBs", progress: 0, total: pendingShipments.length, logs: [], isFinished: false });
+    
+    let processed = 0;
+    
+    for (let i = 0; i < pendingShipments.length; i++) {
+      const shipment = pendingShipments[i];
+      addLog(`[${i+1}/${pendingShipments.length}] Assigning AWB for Shipment: ${shipment.id}...`);
+      try {
+        const res = await fetch(`/api/admin/shipments/${shipment.id}/assign-awb`, { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+          processed++;
+          addLog(`✅ Assigned AWB ${data.shipment.awbCode} for ${shipment.id}`, "success");
+        } else {
+          addLog(`❌ Failed ${shipment.id}: ${data.message}`, "error");
+        }
+      } catch (err: any) {
+        addLog(`❌ Failed ${shipment.id}: ${err.message}`, "error");
+      }
+      setProgressModal(prev => ({ ...prev, progress: i + 1 }));
+    }
+    
+    addLog(`✨ Finished! Assigned ${processed} AWBs.`, "success");
+    setProgressModal(prev => ({ ...prev, isFinished: true }));
+    setProcessingId(null);
+    fetchOrders();
   };
 
   const handleSingleSplit = async (orderId: string) => {
     setProcessingId(`SPLIT-${orderId}`);
+    setProgressModal({ isOpen: true, title: "Splitting Order", progress: 0, total: 1, logs: [], isFinished: false });
+    addLog(`Splitting Order: ${orderId}...`);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/split`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        alert("Order packaging & shipment split executed successfully!");
+        const newSplits = data.shipments?.length || 0;
+        addLog(`✅ Order split successfully into ${newSplits} packages!`, "success");
         fetchOrders();
       } else {
-        alert(`Split Error: ${data.message}`);
+        addLog(`❌ Split Error: ${data.message}`, "error");
       }
-    } catch (err) {
-      alert("Failed to execute order split.");
+    } catch (err: any) {
+      addLog(`❌ Failed to execute order split: ${err.message}`, "error");
     } finally {
+      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
       setProcessingId(null);
     }
   };
 
   const handleSyncShopify = async (orderId: string) => {
     setProcessingId(`SYNC-${orderId}`);
+    setProgressModal({ isOpen: true, title: "Syncing Shopify Order", progress: 0, total: 1, logs: [], isFinished: false });
+    addLog(`Syncing Order: ${orderId}...`);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/sync-shopify`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        alert(`Shopify Order Synced! Shopify ID: ${data.shopifyOrderId || "OK"}`);
+        addLog(`✅ Shopify Order Synced! Shopify ID: ${data.shopifyOrderId || "OK"}`, "success");
         fetchOrders();
       } else {
-        alert(`Shopify Sync Warning: ${data.message || "Endpoint responded with warning"}`);
+        addLog(`⚠️ Shopify Sync Warning: ${data.message || "Endpoint responded with warning"}`, "error");
       }
-    } catch (err) {
-      alert("Shopify manual sync request submitted.");
+    } catch (err: any) {
+      addLog(`❌ Shopify sync failed: ${err.message}`, "error");
     } finally {
+      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
       setProcessingId(null);
     }
   };
 
   const handleAssignAwb = async (shipmentId: string) => {
     setProcessingId(`AWB-${shipmentId}`);
+    setProgressModal({ isOpen: true, title: "Assigning AWB", progress: 0, total: 1, logs: [], isFinished: false });
+    addLog(`Assigning AWB for Shipment: ${shipmentId}...`);
     try {
       const res = await fetch(`/api/admin/shipments/${shipmentId}/assign-awb`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        alert(`AWB Assigned! Code: ${data.shipment.awbCode}`);
+        addLog(`✅ AWB Assigned! Code: ${data.shipment.awbCode}`, "success");
         fetchOrders();
       } else {
-        alert(`AWB Assignment Error: ${data.message}`);
+        addLog(`❌ AWB Assignment Error: ${data.message}`, "error");
       }
-    } catch (err) {
-      alert("Failed to assign AWB.");
+    } catch (err: any) {
+      addLog(`❌ Failed to assign AWB: ${err.message}`, "error");
     } finally {
+      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
       setProcessingId(null);
     }
   };
 
   const handlePrintLabel = async (shipmentId: string) => {
     setProcessingId(`LABEL-${shipmentId}`);
+    setProgressModal({ isOpen: true, title: "Fetching Label", progress: 0, total: 1, logs: [], isFinished: false });
+    addLog(`Fetching shipping label for: ${shipmentId}...`);
     try {
       const res = await fetch(`/api/admin/shipments/${shipmentId}/label`);
       const data = await res.json();
       if (res.ok && data.labelUrl) {
+        addLog(`✅ Label retrieved successfully! Opening in new tab...`, "success");
         window.open(data.labelUrl, "_blank");
       } else {
-        alert(`Label Error: ${data.message || "Failed to fetch label"}`);
+        addLog(`❌ Label Error: ${data.message || "Failed to fetch label"}`, "error");
       }
-    } catch (err) {
-      alert("Failed to fetch shipping label.");
+    } catch (err: any) {
+      addLog(`❌ Failed to fetch shipping label: ${err.message}`, "error");
     } finally {
+      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
       setProcessingId(null);
     }
   };
 
   const downloadLabels = async () => {
+    setProcessingId("DOWNLOAD_LABELS");
+    setProgressModal({ isOpen: true, title: "Downloading Labels", progress: 0, total: 1, logs: [], isFinished: false });
+    addLog(`Generating batch label PDF for today...`);
     try {
       const res = await fetch("/api/admin/labels/download-today");
       if (!res.ok) throw new Error("Download failed");
@@ -245,9 +340,13 @@ export default function AdminOrders() {
       a.href = url;
       a.download = `labels-${new Date().toISOString().slice(0, 10)}.pdf`;
       a.click();
-    } catch (err) {
+      addLog(`✅ Batch labels downloaded successfully!`, "success");
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to download labels.");
+      addLog(`❌ Failed to download labels: ${err.message}`, "error");
+    } finally {
+      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
+      setProcessingId(null);
     }
   };
 
@@ -309,15 +408,21 @@ export default function AdminOrders() {
               disabled={processingId === "BATCH_SPLIT"}
               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
             >
-              <Zap size={15} className={processingId === "BATCH_SPLIT" ? "animate-spin" : "fill-current"} />
-              {processingId === "BATCH_SPLIT" ? "Splitting Today's Orders..." : "⚡ Batch Split Today's Orders"}
+              <Zap size={15} className={processingId === "BATCH_SPLIT" ? "animate-spin" : ""} /> Batch Split Today's Orders
             </button>
-
+            <button
+              onClick={handleBatchAssignAwb}
+              disabled={processingId === "BATCH_AWB"}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
+            >
+              <Truck size={15} className={processingId === "BATCH_AWB" ? "animate-spin" : ""} /> Batch Assign AWBs
+            </button>
             <button
               onClick={downloadLabels}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-sm"
+              disabled={processingId === "DOWNLOAD_LABELS"}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
             >
-              <Download size={15} /> Download Today's Labels
+              <Download size={15} className={processingId === "DOWNLOAD_LABELS" ? "animate-spin" : ""} /> Download Today's Labels
             </button>
           </div>
         </div>
@@ -725,6 +830,56 @@ export default function AdminOrders() {
           })
         )}
       </div>
+
+      {progressModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                {!progressModal.isFinished && <RefreshCw size={14} className="animate-spin text-indigo-600" />}
+                {progressModal.title}
+              </h2>
+              {progressModal.isFinished && (
+                <button onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))} className="text-gray-400 hover:text-black">
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+            
+            <div className="p-4 border-b border-gray-100">
+              <div className="flex justify-between text-xs font-semibold text-gray-500 mb-2">
+                <span>Progress</span>
+                <span>{progressModal.progress} / {progressModal.total}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${progressModal.total > 0 ? (progressModal.progress / progressModal.total) * 100 : 100}%` }} 
+                />
+              </div>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 bg-gray-900 text-gray-300 font-mono text-[10px] sm:text-xs space-y-1.5">
+              {progressModal.logs.map((log, idx) => (
+                <div key={idx} className={`${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-gray-300'}`}>
+                  {log.message}
+                </div>
+              ))}
+            </div>
+
+            {progressModal.isFinished && (
+              <div className="p-3 border-t border-gray-100 bg-gray-50 text-right">
+                <button 
+                  onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))}
+                  className="bg-black text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-neutral-800 transition"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

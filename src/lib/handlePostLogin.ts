@@ -28,5 +28,5 @@ export async function handlePostLogin(router: NextRouter) {
   }
 
   
-  router.replace("/dashboard");
+  router.replace("/");
 }

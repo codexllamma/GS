@@ -13,6 +13,7 @@ import {
   LogOut,
   LogIn,
   ChevronRight,
+  Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
@@ -345,6 +346,17 @@ export const Header: React.FC = () => {
               </div>
 
               <nav className="p-2 space-y-1 flex-1">
+                {session?.user?.isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleProtectedNav("/admin/dashboard")}
+                    className="w-full min-h-[44px] flex items-center gap-3 px-3.5 py-2.5 text-xs font-medium tracking-wider uppercase text-brand-charcoal hover:bg-brand-card rounded-sm transition-colors cursor-pointer text-left"
+                  >
+                    <Shield size={15} className="text-brand-textSec stroke-[1.6]" />
+                    <span className="flex-1 font-serif">Admin Dashboard</span>
+                    <ChevronRight size={14} className="text-brand-textSec" />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleProtectedNav("/orders/orders-page")}

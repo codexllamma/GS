@@ -53,7 +53,7 @@ export default function ComingSoonLanding() {
   }, []);
 
   const handleJoinClick = () => {
-    localStorage.setItem("redirectIntent", "/dashboard");
+    localStorage.setItem("redirectIntent", "/");
     open();
   };
 

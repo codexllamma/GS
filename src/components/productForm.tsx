@@ -4,7 +4,7 @@ import { X, Upload } from "lucide-react";
 
 interface ProductFormProps {
   initialData?: any;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => Promise<void> | void;
   onCancel?: () => void;
 }
 
@@ -14,6 +14,10 @@ interface Variant { size: string; price: string; stock: string; }
 
 export default function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProps) {
   // --- FORM STATE ---
+  const [isDirty, setIsDirty] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -86,6 +90,7 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
   // --- HANDLERS ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    setIsDirty(true);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,6 +113,7 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
         newUrls.push(data.publicUrl);
       }
       setUploadedImages(prev => [...prev, ...newUrls]);
+      setIsDirty(true);
     } catch (err) {
       console.error("Upload failed:", err);
       alert("Upload failed.");
@@ -118,6 +124,7 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
 
   const removeImage = (index: number) => {
     setUploadedImages(prev => prev.filter((_, i) => i !== index));
+    setIsDirty(true);
   };
 
   const toggleVariant = (size: string) => {
@@ -126,25 +133,65 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
       if (exists) return prev.filter(v => v.size !== size);
       return [...prev, { size, price: form.basePrice, stock: "0" }];
     });
+    setIsDirty(true);
   };
 
   const updateVariant = (size: string, field: keyof Variant, value: string) => {
     setVariants(prev => prev.map(v => v.size === size ? { ...v, [field]: value } : v));
+    setIsDirty(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedCategory(e.target.value);
+    setIsDirty(true);
+  };
+
+  const handleFabricChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedFabric(e.target.value);
+    setIsDirty(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      ...form,
-      basePrice: Number(form.basePrice),
-      fabricId: selectedFabric,
-      images: uploadedImages, // Array of strings
-      variants: variants.map(v => ({
-        size: v.size,
-        price: Number(v.price),
-        stock: Number(v.stock)
-      })),
-    });
+    setSaving(true);
+    try {
+      await onSubmit({
+        ...form,
+        basePrice: Number(form.basePrice),
+        fabricId: selectedFabric,
+        images: uploadedImages, // Array of strings
+        variants: variants.map(v => ({
+          size: v.size,
+          price: Number(v.price),
+          stock: Number(v.stock)
+        })),
+      });
+      setIsDirty(false);
+    } catch (err) {
+      console.error(err);
+      alert("Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!initialData?.id || isDirty) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/shopify/sync/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: initialData.id }),
+      });
+      if (res.ok) alert("Product synced to Shopify successfully!");
+      else alert("Failed to sync product to Shopify");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to sync product to Shopify");
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -165,11 +212,11 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-             <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} className="border p-2 rounded" required>
+             <select value={selectedCategory} onChange={handleCategoryChange} className="border p-2 rounded" required>
                <option value="">Select Category</option>
                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
              </select>
-             <select value={selectedFabric} onChange={e => setSelectedFabric(e.target.value)} className="border p-2 rounded" disabled={!selectedCategory} required>
+             <select value={selectedFabric} onChange={handleFabricChange} className="border p-2 rounded" disabled={!selectedCategory} required>
                <option value="">Select Fabric</option>
                {fabrics.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
              </select>
@@ -225,11 +272,30 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
         </div>
       </div>
 
-      <div className="pt-4 border-t flex justify-end gap-3">
+      <div className="pt-4 border-t flex justify-end gap-3 items-center">
         {onCancel && <button type="button" onClick={onCancel} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel</button>}
-        <button type="submit" disabled={uploading} className="bg-black text-white px-6 py-2 rounded hover:bg-neutral-800 transition">
-          {initialData ? "Save Changes" : "Create Product"}
+        
+        <button type="submit" disabled={uploading || saving} className="bg-black text-white px-6 py-2 rounded hover:bg-neutral-800 transition">
+          {saving ? "Saving..." : initialData ? "Save Changes" : "Create Product"}
         </button>
+
+        {initialData?.id && (
+          <div className="relative group">
+            <button 
+              type="button" 
+              onClick={handleSync}
+              disabled={isDirty || syncing}
+              className={`px-4 py-2 rounded font-medium transition ${isDirty ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-brand-olive text-white hover:bg-brand-olive/90'}`}
+            >
+              {syncing ? 'Syncing...' : 'Sync to Shopify'}
+            </button>
+            {isDirty && (
+              <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-48 p-2 bg-black text-white text-xs rounded shadow-lg z-10 text-center">
+                Please save your changes first
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </form>
   );

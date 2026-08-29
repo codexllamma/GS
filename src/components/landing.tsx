@@ -194,7 +194,7 @@ export default function LandingPage() {
           {/* Card 3 */}
           <button
             onClick={() => {
-              localStorage.setItem("redirectIntent", "/dashboard");
+              localStorage.setItem("redirectIntent", "/");
               open();
             }}
             className="group text-left h-full w-full"

@@ -44,6 +44,13 @@ export async function middleware(req: any) {
     }
   }
 
+  // Admin access check
+  if (pathname.startsWith("/admin")) {
+    if (!token || !token.isAdmin) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+  }
+
   // Authenticated + Whitelisted users proceed freely
   return NextResponse.next();
 }

@@ -69,9 +69,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
 
       if (onSuccess) {
         onSuccess();
-        router.push(redirectIntent || "/dashboard");
-      } else {
-        router.push(redirectIntent || "/dashboard");
+        router.push(redirectIntent || "/");
       }
 
     } catch (err: any) {
@@ -85,7 +83,7 @@ const AuthForm = ({ onSuccess }: AuthFormProps) => {
     setLoading(true);
 
     const redirectIntent =
-      localStorage.getItem("redirectIntent") || "/dashboard";
+      localStorage.getItem("redirectIntent") || "/";
 
     await signIn("google", {
       callbackUrl: redirectIntent,

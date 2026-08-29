@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ProductForm from "@/components/productForm";
 import { useSession } from "next-auth/react";
-import { ChevronDown, ChevronUp, Edit2, Trash2, Package } from "lucide-react";
+import { ChevronDown, ChevronUp, Edit2, Trash2, Package, RefreshCw, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 
@@ -30,6 +30,27 @@ export default function AdminProductsPage() {
   // Track expanded cards by ID
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+  // --- PROGRESS MODAL STATE ---
+  const [progressModal, setProgressModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    progress: number;
+    total: number;
+    logs: { message: string; type: "info" | "success" | "error" }[];
+    isFinished: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    progress: 0,
+    total: 0,
+    logs: [],
+    isFinished: false,
+  });
+
+  const addLog = (message: string, type: "info" | "success" | "error" = "info") => {
+    setProgressModal(prev => ({ ...prev, logs: [...prev.logs, { message, type }] }));
+  };
+
   const toggleExpand = (id: string) => {
     const next = new Set(expandedIds);
     if (next.has(id)) next.delete(id);
@@ -53,7 +74,9 @@ export default function AdminProductsPage() {
     if (res.ok) {
       const newProduct = await res.json();
       setProducts((prev) => [newProduct, ...prev]);
-      setShowForm(false);
+      setEditingProduct(newProduct);
+    } else {
+      throw new Error("Failed to create product");
     }
   };
 
@@ -67,8 +90,9 @@ export default function AdminProductsPage() {
     if (res.ok) {
       const updated = await res.json();
       setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      setEditingProduct(null);
-      setShowForm(false);
+      setEditingProduct(updated);
+    } else {
+      throw new Error("Failed to update product");
     }
   };
 
@@ -76,6 +100,30 @@ export default function AdminProductsPage() {
     if(!confirm("Are you sure?")) return;
     const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
     if (res.ok) setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleSyncAll = async () => {
+    if(!confirm("Are you sure you want to sync ALL products to Shopify? This may take a while.")) return;
+    setProgressModal({ isOpen: true, title: "Syncing All Products", progress: 0, total: products.length, logs: [], isFinished: false });
+    addLog(`Initiating bulk sync...`);
+    try {
+      const res = await fetch("/api/shopify/sync/all-products", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        addLog(`✅ Bulk sync completed in ${data.duration}!`, "success");
+        addLog(`Successfully synced: ${data.successCount}`, "success");
+        if (data.failureCount > 0) {
+          addLog(`❌ Failed to sync: ${data.failureCount}`, "error");
+          data.failures.forEach((f: any) => addLog(`- ${f.name}: ${f.error}`, "error"));
+        }
+      } else {
+        addLog(`❌ Bulk sync failed: ${data.error}`, "error");
+      }
+    } catch (err: any) {
+      addLog(`❌ Sync failed: ${err.message}`, "error");
+    } finally {
+      setProgressModal(prev => ({ ...prev, progress: products.length, isFinished: true }));
+    }
   };
 
   if (status === "loading") return <div className="p-8">Loading...</div>;
@@ -89,14 +137,25 @@ export default function AdminProductsPage() {
           <h1 className="text-xl font-bold">Products</h1>
           <p className="text-sm text-gray-500">{products.length} items in catalog</p>
         </div>
-        {!showForm && (
-           <button 
-             onClick={() => setShowForm(true)}
-             className="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800"
-           >
-             + Add Product
-           </button>
-        )}
+        <div className="flex gap-2">
+          <button 
+             onClick={handleSyncAll}
+             className="bg-brand-olive text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-olive/90 transition-colors"
+          >
+             Sync All to Shopify
+          </button>
+          {!showForm && (
+             <button 
+               onClick={() => {
+                 setEditingProduct(null);
+                 setShowForm(true);
+               }}
+               className="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors"
+             >
+               + Add Product
+             </button>
+          )}
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
@@ -202,6 +261,56 @@ export default function AdminProductsPage() {
           </div>
         )}
       </div>
+
+      {progressModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                {!progressModal.isFinished && <RefreshCw size={14} className="animate-spin text-indigo-600" />}
+                {progressModal.title}
+              </h2>
+              {progressModal.isFinished && (
+                <button onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))} className="text-gray-400 hover:text-black">
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+            
+            <div className="p-4 border-b border-gray-100">
+              <div className="flex justify-between text-xs font-semibold text-gray-500 mb-2">
+                <span>Progress</span>
+                <span>{progressModal.progress} / {progressModal.total}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
+                  style={{ width: `${progressModal.total > 0 ? (progressModal.progress / progressModal.total) * 100 : 100}%` }} 
+                />
+              </div>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 bg-gray-900 text-gray-300 font-mono text-[10px] sm:text-xs space-y-1.5">
+              {progressModal.logs.map((log, idx) => (
+                <div key={idx} className={`${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-gray-300'}`}>
+                  {log.message}
+                </div>
+              ))}
+            </div>
+
+            {progressModal.isFinished && (
+              <div className="p-3 border-t border-gray-100 bg-gray-50 text-right">
+                <button 
+                  onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))}
+                  className="bg-black text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-neutral-800 transition"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

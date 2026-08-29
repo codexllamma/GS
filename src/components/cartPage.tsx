@@ -96,7 +96,7 @@ const CartPage: React.FC = () => {
     <div className="min-h-screen bg-neutral-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 py-6 sm:py-10 lg:py-14">
         <Link
-          href="/dashboard"
+          href="/"
           className="inline-flex items-center text-neutral-600 hover:text-black mb-8 sm:mb-12 text-sm transition-colors"
         >
           <ArrowLeft size={18} className="mr-2" /> Continue shopping

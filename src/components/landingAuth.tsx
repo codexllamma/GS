@@ -5,7 +5,7 @@ const LandingAuthButton = () => {
   const { open } = useAuthModal();
 
   const handleClick = () => {
-    localStorage.setItem("redirectIntent", "/dashboard");
+    localStorage.setItem("redirectIntent", "/");
     open();
   };
 
