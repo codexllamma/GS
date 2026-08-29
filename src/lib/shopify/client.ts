@@ -1,21 +1,5 @@
 // lib/shopify/client.ts
 
-const SHOP = process.env.SHOPIFY_STORE_DOMAIN!;
-const TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN!;
-const API_VERSION = process.env.SHOPIFY_API_VERSION!;
-
-if (!SHOP) {
-  throw new Error("Missing SHOPIFY_STORE_DOMAIN");
-}
-
-if (!TOKEN) {
-  throw new Error("Missing SHOPIFY_ADMIN_ACCESS_TOKEN");
-}
-
-if (!API_VERSION) {
-  throw new Error("Missing SHOPIFY_API_VERSION");
-}
-
 type GraphQLResponse<T> = {
   data?: T;
   errors?: {
@@ -30,23 +14,39 @@ type GraphQLResponse<T> = {
 };
 
 class ShopifyClient {
-  private readonly baseUrl = `https://${SHOP}/admin/api/${API_VERSION}`;
+  private get credentials() {
+    const shop = process.env.SHOPIFY_STORE_DOMAIN;
+    const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    const apiVersion = process.env.SHOPIFY_API_VERSION || "2024-07";
+
+    if (!shop || !token) {
+      throw new Error("Missing SHOPIFY_STORE_DOMAIN or SHOPIFY_ADMIN_ACCESS_TOKEN in environment variables");
+    }
+
+    return {
+      shop,
+      token,
+      baseUrl: `https://${shop}/admin/api/${apiVersion}`,
+    };
+  }
 
   private async request(
     endpoint: string,
     options: RequestInit = {}
   ) {
-    console.log("=== SHOPIFY AUTH DEBUG ===");
-    console.log("Domain:", SHOP);
-    console.log("Token Exists:", Boolean(TOKEN));
-    console.log("Token Prefix:", TOKEN?.slice(0, 8)); // Should print "shpat_xx"
-    console.log("Token Length:", TOKEN?.length);
-    console.log("Endpoint URL:", `${this.baseUrl}/${endpoint}`);
+    const { shop, token, baseUrl } = this.credentials;
 
-    const response = await fetch(`${this.baseUrl}/${endpoint}`, {
+    console.log("=== SHOPIFY AUTH DEBUG ===");
+    console.log("Domain:", shop);
+    console.log("Token Exists:", Boolean(token));
+    console.log("Token Prefix:", token?.slice(0, 8)); // Should print "shpat_xx"
+    console.log("Token Length:", token?.length);
+    console.log("Endpoint URL:", `${baseUrl}/${endpoint}`);
+
+    const response = await fetch(`${baseUrl}/${endpoint}`, {
       ...options,
       headers: {
-        "X-Shopify-Access-Token": TOKEN,
+        "X-Shopify-Access-Token": token,
         "Content-Type": "application/json",
         Accept: "application/json",
         ...(options.headers ?? {}),
