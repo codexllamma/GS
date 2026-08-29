@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import Image from "next/image";
@@ -17,6 +17,31 @@ export default function Home() {
   const router = useRouter();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const initialScrollExecuted = useRef(false);
+
+  useEffect(() => {
+    // 1. Wait until Next.js router query params are fully populated on client
+    if (!router.isReady || initialScrollExecuted.current) return;
+
+    const { category, search, filter } = router.query;
+
+    if (category || search || filter) {
+      // 2. Small RAF tick to ensure DOM elements and layout heights have painted
+      const timer = setTimeout(() => {
+        const targetElement = document.getElementById("catalog-section");
+
+        if (targetElement) {
+          targetElement.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+          initialScrollExecuted.current = true;
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [router.isReady, router.query]);
 
   // Read `?product=id` from URL query string
   const activeProductId =
@@ -42,7 +67,7 @@ export default function Home() {
       <Hero />
 
       {/* Dynamic Products Grid with Infinite Scroll */}
-      <div id="catalog" className="w-full pt-2">
+      <div id="catalog-section" className="w-full pt-2 scroll-mt-20">
         <ProductsGrid />
       </div>
 
