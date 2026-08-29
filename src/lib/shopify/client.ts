@@ -36,6 +36,13 @@ class ShopifyClient {
     endpoint: string,
     options: RequestInit = {}
   ) {
+    console.log("=== SHOPIFY AUTH DEBUG ===");
+    console.log("Domain:", SHOP);
+    console.log("Token Exists:", Boolean(TOKEN));
+    console.log("Token Prefix:", TOKEN?.slice(0, 8)); // Should print "shpat_xx"
+    console.log("Token Length:", TOKEN?.length);
+    console.log("Endpoint URL:", `${this.baseUrl}/${endpoint}`);
+
     const response = await fetch(`${this.baseUrl}/${endpoint}`, {
       ...options,
       headers: {
