@@ -68,8 +68,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       shippingMethods.push({
         id: "cod_standard",
         name: "Cash on Delivery",
-        description: "Pay cash upon delivery",
-        serviceable: isServiceable && isCodAvailable,     // Base shipping cost (0 if free shipping)
+        description: "₹59 Cash handling charge",
+        serviceable: isServiceable && isCodAvailable,
+        shipping_fee: 0,     // Base shipping cost (0 if free shipping)
         cod: true,           // Unlocks the COD payment option
         cod_fee: 5900,       // ₹59 in paise (The extra COD surcharge)
       });
