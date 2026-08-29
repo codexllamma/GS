@@ -100,8 +100,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const orderData = rzpOrderRes.ok ? await rzpOrderRes.json() : {};
     const paymentData = rzpPaymentRes.ok ? await rzpPaymentRes.json() : {};
 
-    // ---> NEW: Check if the Razorpay payment method was COD <---
+    // Check if the Razorpay payment method was COD & calculate charges
     const isCodOrder = paymentData.method === "cod";
+    const subtotal = Number(session.amount);
+    const deliveryCharge = isCodOrder ? 59.0 : 0.0;
+    const total = subtotal + deliveryCharge;
 
     // Extract customer contact info
     const customerEmail =
@@ -204,7 +207,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
 
-      // Step C: Create Order with nested OrderItems
+      // Step C: Create Order with nested OrderItems & Dynamic COD Delivery Fee
       const newOrder = await tx.order.create({
         data: {
           userId: user?.id || session.userId,
@@ -212,15 +215,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           checkoutSessionId: session.id,
           razorpayOrderId: razorpay_order_id,
           razorpayPaymentId: razorpay_payment_id,
-          subtotal: session.amount,
-          deliveryCharge: 0.0,
-          total: session.amount,
+          subtotal: subtotal,
+          deliveryCharge: deliveryCharge,
+          total: total,
           status: "PROCESSING",
-          
-          // ---> NEW: Dynamically toggle based on Razorpay's payload <---
           paymentMethod: isCodOrder ? "COD" : "RAZORPAY",
           isPaid: !isCodOrder,
-          
           orderItems: {
             create: cartSnapshot.map((item) => ({
               variantId: item.variantId,

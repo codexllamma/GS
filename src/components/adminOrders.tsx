@@ -103,9 +103,9 @@ export default function AdminOrders() {
   };
 
   // --- 1. FETCH ORDERS ---
-  const fetchOrders = async () => {
+  const fetchOrders = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await fetch("/api/admin/orders");
       if (res.ok) {
         const data = await res.json();
@@ -114,7 +114,7 @@ export default function AdminOrders() {
     } catch (error) {
 
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -207,7 +207,7 @@ export default function AdminOrders() {
     addLog(`✨ Finished! Created ${totalSplits} total splits from ${processed} orders.`, "success");
     setProgressModal(prev => ({ ...prev, isFinished: true }));
     setProcessingId(null);
-    fetchOrders();
+    fetchOrders(true);
   };
 
   const handleBatchAssignAwb = async () => {
@@ -244,7 +244,7 @@ export default function AdminOrders() {
     addLog(`✨ Finished! Assigned ${processed} AWBs.`, "success");
     setProgressModal(prev => ({ ...prev, isFinished: true }));
     setProcessingId(null);
-    fetchOrders();
+    fetchOrders(true);
   };
 
   const handleSingleSplit = async (orderId: string) => {
@@ -257,7 +257,7 @@ export default function AdminOrders() {
       if (res.ok) {
         const newSplits = data.shipments?.length || 0;
         addLog(`✅ Order split successfully into ${newSplits} packages!`, "success");
-        fetchOrders();
+        fetchOrders(true);
       } else {
         addLog(`❌ Split Error: ${data.message}`, "error");
       }
@@ -278,7 +278,7 @@ export default function AdminOrders() {
       const data = await res.json();
       if (res.ok) {
         addLog(`✅ Shopify Order Synced! Shopify ID: ${data.shopifyOrderId || "OK"}`, "success");
-        fetchOrders();
+        fetchOrders(true);
       } else {
         addLog(`⚠️ Shopify Sync Warning: ${data.message || "Endpoint responded with warning"}`, "error");
       }
@@ -299,7 +299,7 @@ export default function AdminOrders() {
       const data = await res.json();
       if (res.ok) {
         addLog(`✅ AWB Assigned! Code: ${data.shipment.awbCode}`, "success");
-        fetchOrders();
+        fetchOrders(true);
       } else {
         addLog(`❌ AWB Assignment Error: ${data.message}`, "error");
       }
@@ -838,46 +838,46 @@ export default function AdminOrders() {
       </div>
 
       {progressModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                {!progressModal.isFinished && <RefreshCw size={14} className="animate-spin text-indigo-600" />}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-brand-bg border border-brand-border rounded-sm shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-brand-border flex justify-between items-center bg-brand-stone/30">
+              <h2 className="text-[11px] font-bold text-brand-charcoal uppercase tracking-widest flex items-center gap-2">
+                {!progressModal.isFinished && <RefreshCw size={14} className="animate-spin text-brand-olive" />}
                 {progressModal.title}
               </h2>
               {progressModal.isFinished && (
-                <button onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))} className="text-gray-400 hover:text-black">
-                  <X size={18} />
+                <button onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))} className="text-brand-textSec hover:text-brand-charcoal transition-colors">
+                  <X size={16} />
                 </button>
               )}
             </div>
             
-            <div className="p-4 border-b border-gray-100">
-              <div className="flex justify-between text-xs font-semibold text-gray-500 mb-2">
+            <div className="p-4 border-b border-brand-border">
+              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-brand-textSec mb-2">
                 <span>Progress</span>
                 <span>{progressModal.progress} / {progressModal.total}</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-brand-stone/50 rounded-full h-1.5 overflow-hidden border border-brand-border/50">
                 <div 
-                  className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
+                  className="bg-brand-olive h-full transition-all duration-300" 
                   style={{ width: `${progressModal.total > 0 ? (progressModal.progress / progressModal.total) * 100 : 100}%` }} 
                 />
               </div>
             </div>
 
-            <div className="p-4 overflow-y-auto flex-1 bg-gray-900 text-gray-300 font-mono text-[10px] sm:text-xs space-y-1.5">
+            <div className="p-4 overflow-y-auto flex-1 bg-brand-card font-mono text-[10px] sm:text-[11px] space-y-2 border-b border-brand-border/50">
               {progressModal.logs.map((log, idx) => (
-                <div key={idx} className={`${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-gray-300'}`}>
+                <div key={idx} className={`${log.type === 'error' ? 'text-rose-600 font-semibold' : log.type === 'success' ? 'text-emerald-700 font-medium' : 'text-brand-textSec'}`}>
                   {log.message}
                 </div>
               ))}
             </div>
 
             {progressModal.isFinished && (
-              <div className="p-3 border-t border-gray-100 bg-gray-50 text-right">
+              <div className="p-4 bg-brand-stone/20 text-right">
                 <button 
                   onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))}
-                  className="bg-black text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-neutral-800 transition"
+                  className="bg-brand-btn text-white px-6 py-2 rounded-sm text-[11px] uppercase tracking-widest font-semibold hover:opacity-90 transition-opacity"
                 >
                   Close
                 </button>

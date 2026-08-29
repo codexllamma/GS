@@ -193,7 +193,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     };
 
     fetchProductDetails();
-  }, [productId, onClose, x]);
+  }, [productId]);
 
   // Track ViewContent / view_item when product data successfully loads
   useEffect(() => {
