@@ -1,3 +1,4 @@
+// pages/api/checkout/verify-payment.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
@@ -98,6 +99,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const orderData = rzpOrderRes.ok ? await rzpOrderRes.json() : {};
     const paymentData = rzpPaymentRes.ok ? await rzpPaymentRes.json() : {};
+
+    // ---> NEW: Check if the Razorpay payment method was COD <---
+    const isCodOrder = paymentData.method === "cod";
 
     // Extract customer contact info
     const customerEmail =
@@ -212,8 +216,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           deliveryCharge: 0.0,
           total: session.amount,
           status: "PROCESSING",
-          paymentMethod: "RAZORPAY",
-          isPaid: true,
+          
+          // ---> NEW: Dynamically toggle based on Razorpay's payload <---
+          paymentMethod: isCodOrder ? "COD" : "RAZORPAY",
+          isPaid: !isCodOrder,
+          
           orderItems: {
             create: cartSnapshot.map((item) => ({
               variantId: item.variantId,
@@ -249,8 +256,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 5. Shopify Auto-Sync
     try {
-
-
       // Sync order & customer profile to Shopify
       await syncOrder(createdOrder.id);
 
@@ -258,16 +263,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       for (const variantId of purchasedVariantIds) {
         await syncVariantInventory(variantId);
       }
-
-
     } catch (syncErr) {
       console.error(`[SHOPIFY AUTO-SYNC ERROR] Order ${createdOrder.id} sync failed:`, syncErr);
     }
 
     // 6. Meta CAPI Purchase Trigger
     try {
-
-
       const clientIpHeader = req.headers["x-forwarded-for"];
       const clientIp = typeof clientIpHeader === "string"
         ? clientIpHeader.split(",")[0].trim()
@@ -282,13 +283,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clientIp: clientIp || undefined,
         userAgent: req.headers["user-agent"],
       });
-
-
     } catch (capiErr) {
       console.error(`[META CAPI ERROR] Order ${createdOrder.id} CAPI dispatch failed:`, capiErr);
     }
-
-
 
     return res.status(200).json({
       success: true,
