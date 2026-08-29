@@ -22,6 +22,7 @@ import {
   Building,
   X
 } from "lucide-react";
+import ConfirmModal from "@/components/confirmModal";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Shipment {
@@ -102,6 +103,22 @@ export default function AdminOrders() {
     setProgressModal(prev => ({ ...prev, logs: [...prev.logs, { message, type }] }));
   };
 
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    isDestructive: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "Confirm",
+    isDestructive: false,
+    onConfirm: () => {},
+  });
+
   // --- 1. FETCH ORDERS ---
   const fetchOrders = async (silent = false) => {
     try {
@@ -176,38 +193,47 @@ export default function AdminOrders() {
       setProgressModal({ isOpen: true, title: "Batch Splitting Orders", progress: 1, total: 1, logs: [{ message: "No pending orders require splitting.", type: "info" }], isFinished: true });
       return;
     }
-    if (!confirm(`Run auto-split for ${pendingOrders.length} orders?`)) return;
-
-    setProcessingId("BATCH_SPLIT");
-    setProgressModal({ isOpen: true, title: "Batch Splitting Orders", progress: 0, total: pendingOrders.length, logs: [], isFinished: false });
     
-    let processed = 0;
-    let totalSplits = 0;
-    
-    for (let i = 0; i < pendingOrders.length; i++) {
-      const order = pendingOrders[i];
-      addLog(`[${i+1}/${pendingOrders.length}] Splitting Order: ${order.id}...`);
-      try {
-        const res = await fetch(`/api/admin/orders/${order.id}/split`, { method: "POST" });
-        const data = await res.json();
-        if (res.ok) {
-          processed++;
-          const newSplits = data.shipments?.length || 0;
-          totalSplits += newSplits;
-          addLog(`✅ Order ${order.id} split into ${newSplits} packages.`, "success");
-        } else {
-          addLog(`❌ Failed ${order.id}: ${data.message}`, "error");
+    setConfirmConfig({
+      isOpen: true,
+      title: "Batch Split Orders",
+      message: `Are you sure you want to run auto-split for ${pendingOrders.length} pending orders?`,
+      confirmText: "Split Orders",
+      isDestructive: false,
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        setProcessingId("BATCH_SPLIT");
+        setProgressModal({ isOpen: true, title: "Batch Splitting Orders", progress: 0, total: pendingOrders.length, logs: [], isFinished: false });
+        
+        let processed = 0;
+        let totalSplits = 0;
+        
+        for (let i = 0; i < pendingOrders.length; i++) {
+          const order = pendingOrders[i];
+          addLog(`[${i+1}/${pendingOrders.length}] Splitting Order: ${order.id}...`);
+          try {
+            const res = await fetch(`/api/admin/orders/${order.id}/split`, { method: "POST" });
+            const data = await res.json();
+            if (res.ok) {
+              processed++;
+              const newSplits = data.shipments?.length || 0;
+              totalSplits += newSplits;
+              addLog(`✅ Order ${order.id} split into ${newSplits} packages.`, "success");
+            } else {
+              addLog(`❌ Failed ${order.id}: ${data.message}`, "error");
+            }
+          } catch (err: any) {
+            addLog(`❌ Failed ${order.id}: ${err.message}`, "error");
+          }
+          setProgressModal(prev => ({ ...prev, progress: i + 1 }));
         }
-      } catch (err: any) {
-        addLog(`❌ Failed ${order.id}: ${err.message}`, "error");
+        
+        addLog(`✨ Finished! Created ${totalSplits} total splits from ${processed} orders.`, "success");
+        setProgressModal(prev => ({ ...prev, isFinished: true }));
+        setProcessingId(null);
+        fetchOrders(true);
       }
-      setProgressModal(prev => ({ ...prev, progress: i + 1 }));
-    }
-    
-    addLog(`✨ Finished! Created ${totalSplits} total splits from ${processed} orders.`, "success");
-    setProgressModal(prev => ({ ...prev, isFinished: true }));
-    setProcessingId(null);
-    fetchOrders(true);
+    });
   };
 
   const handleBatchAssignAwb = async () => {
@@ -216,35 +242,44 @@ export default function AdminOrders() {
       setProgressModal({ isOpen: true, title: "Batch Assigning AWBs", progress: 1, total: 1, logs: [{ message: "No pending shipments require AWB assignment.", type: "info" }], isFinished: true });
       return;
     }
-    if (!confirm(`Assign AWBs for ${pendingShipments.length} shipments?`)) return;
-
-    setProcessingId("BATCH_AWB");
-    setProgressModal({ isOpen: true, title: "Batch Assigning AWBs", progress: 0, total: pendingShipments.length, logs: [], isFinished: false });
     
-    let processed = 0;
-    
-    for (let i = 0; i < pendingShipments.length; i++) {
-      const shipment = pendingShipments[i];
-      addLog(`[${i+1}/${pendingShipments.length}] Assigning AWB for Shipment: ${shipment.id}...`);
-      try {
-        const res = await fetch(`/api/admin/shipments/${shipment.id}/assign-awb`, { method: "POST" });
-        const data = await res.json();
-        if (res.ok) {
-          processed++;
-          addLog(`✅ Assigned AWB ${data.shipment.awbCode} for ${shipment.id}`, "success");
-        } else {
-          addLog(`❌ Failed ${shipment.id}: ${data.message}`, "error");
+    setConfirmConfig({
+      isOpen: true,
+      title: "Batch Assign AWBs",
+      message: `Are you sure you want to assign AWBs for ${pendingShipments.length} pending shipments?`,
+      confirmText: "Assign AWBs",
+      isDestructive: false,
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        setProcessingId("BATCH_AWB");
+        setProgressModal({ isOpen: true, title: "Batch Assigning AWBs", progress: 0, total: pendingShipments.length, logs: [], isFinished: false });
+        
+        let processed = 0;
+        
+        for (let i = 0; i < pendingShipments.length; i++) {
+          const shipment = pendingShipments[i];
+          addLog(`[${i+1}/${pendingShipments.length}] Assigning AWB for Shipment: ${shipment.id}...`);
+          try {
+            const res = await fetch(`/api/admin/shipments/${shipment.id}/assign-awb`, { method: "POST" });
+            const data = await res.json();
+            if (res.ok) {
+              processed++;
+              addLog(`✅ Assigned AWB ${data.shipment.awbCode} for ${shipment.id}`, "success");
+            } else {
+              addLog(`❌ Failed ${shipment.id}: ${data.message}`, "error");
+            }
+          } catch (err: any) {
+            addLog(`❌ Failed ${shipment.id}: ${err.message}`, "error");
+          }
+          setProgressModal(prev => ({ ...prev, progress: i + 1 }));
         }
-      } catch (err: any) {
-        addLog(`❌ Failed ${shipment.id}: ${err.message}`, "error");
+        
+        addLog(`✨ Finished! Assigned ${processed} AWBs.`, "success");
+        setProgressModal(prev => ({ ...prev, isFinished: true }));
+        setProcessingId(null);
+        fetchOrders(true);
       }
-      setProgressModal(prev => ({ ...prev, progress: i + 1 }));
-    }
-    
-    addLog(`✨ Finished! Assigned ${processed} AWBs.`, "success");
-    setProgressModal(prev => ({ ...prev, isFinished: true }));
-    setProcessingId(null);
-    fetchOrders(true);
+    });
   };
 
   const handleSingleSplit = async (orderId: string) => {
@@ -886,6 +921,10 @@ export default function AdminOrders() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        {...confirmConfig}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

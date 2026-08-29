@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { ChevronDown, ChevronUp, Edit2, Trash2, Package, RefreshCw, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import ConfirmModal from "@/components/confirmModal";
 
 // Match the full API response structure
 interface Product {
@@ -29,6 +30,15 @@ export default function AdminProductsPage() {
   
   // Track expanded cards by ID
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "",
+    isDestructive: false,
+    onConfirm: () => {},
+  });
 
   // --- PROGRESS MODAL STATE ---
   const [progressModal, setProgressModal] = useState<{
@@ -97,33 +107,51 @@ export default function AdminProductsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if(!confirm("Are you sure?")) return;
-    const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
-    if (res.ok) setProducts((prev) => prev.filter((p) => p.id !== id));
+    setConfirmConfig({
+      isOpen: true,
+      title: "Delete Product",
+      message: "Are you sure you want to delete this product? This action cannot be undone.",
+      confirmText: "Delete",
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+        if (res.ok) setProducts((prev) => prev.filter((p) => p.id !== id));
+      }
+    });
   };
 
   const handleSyncAll = async () => {
-    if(!confirm("Are you sure you want to sync ALL products to Shopify? This may take a while.")) return;
-    setProgressModal({ isOpen: true, title: "Syncing All Products", progress: 0, total: products.length, logs: [], isFinished: false });
-    addLog(`Initiating bulk sync...`);
-    try {
-      const res = await fetch("/api/shopify/sync/all-products", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        addLog(`✅ Bulk sync completed in ${data.duration}!`, "success");
-        addLog(`Successfully synced: ${data.successCount}`, "success");
-        if (data.failureCount > 0) {
-          addLog(`❌ Failed to sync: ${data.failureCount}`, "error");
-          data.failures.forEach((f: any) => addLog(`- ${f.name}: ${f.error}`, "error"));
+    setConfirmConfig({
+      isOpen: true,
+      title: "Sync All Products",
+      message: "Are you sure you want to sync ALL products to Shopify? This may take a while.",
+      confirmText: "Sync All",
+      isDestructive: false,
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        setProgressModal({ isOpen: true, title: "Syncing All Products", progress: 0, total: products.length, logs: [], isFinished: false });
+        addLog(`Initiating bulk sync...`);
+        try {
+          const res = await fetch("/api/shopify/sync/all-products", { method: "POST" });
+          const data = await res.json();
+          if (res.ok) {
+            addLog(`✅ Bulk sync completed in ${data.duration}!`, "success");
+            addLog(`Successfully synced: ${data.successCount}`, "success");
+            if (data.failureCount > 0) {
+              addLog(`❌ Failed to sync: ${data.failureCount}`, "error");
+              data.failures.forEach((f: any) => addLog(`- ${f.name}: ${f.error}`, "error"));
+            }
+          } else {
+            addLog(`❌ Bulk sync failed: ${data.error}`, "error");
+          }
+        } catch (err: any) {
+          addLog(`❌ Sync failed: ${err.message}`, "error");
+        } finally {
+          setProgressModal(prev => ({ ...prev, progress: products.length, isFinished: true }));
         }
-      } else {
-        addLog(`❌ Bulk sync failed: ${data.error}`, "error");
       }
-    } catch (err: any) {
-      addLog(`❌ Sync failed: ${err.message}`, "error");
-    } finally {
-      setProgressModal(prev => ({ ...prev, progress: products.length, isFinished: true }));
-    }
+    });
   };
 
   if (status === "loading") return <div className="p-8">Loading...</div>;
@@ -311,6 +339,10 @@ export default function AdminProductsPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        {...confirmConfig}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

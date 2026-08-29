@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import ConfirmModal from "@/components/confirmModal";
 import {
   ArrowLeft,
   Package,
@@ -80,6 +81,14 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "",
+    isDestructive: false,
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     if (!orderId) return;
@@ -108,30 +117,36 @@ export default function OrderDetailPage() {
   }, [orderId]);
 
   const handleCancelOrder = async () => {
-    if (!window.confirm("Are you sure you want to cancel this order? This action cannot be undone.")) {
-      return;
-    }
+    setConfirmConfig({
+      isOpen: true,
+      title: "Cancel Order",
+      message: "Are you sure you want to cancel this order? This action cannot be undone.",
+      confirmText: "Cancel Order",
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        setIsCancelling(true);
+        try {
+          const res = await fetch(`/api/orders/${orderId}`, {
+            method: "PATCH",
+          });
+          
+          const data = await res.json();
 
-    setIsCancelling(true);
-    try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-      });
-      
-      const data = await res.json();
-
-      if (res.ok) {
-        // Optimistically update the local state to show 'Cancelled' immediately
-        setOrder((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
-      } else {
-        alert(data.message || "Failed to cancel order.");
+          if (res.ok) {
+            // Optimistically update the local state to show 'Cancelled' immediately
+            setOrder((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
+          } else {
+            alert(data.message || "Failed to cancel order.");
+          }
+        } catch (error) {
+          console.error("Cancel order error:", error);
+          alert("An error occurred while cancelling the order.");
+        } finally {
+          setIsCancelling(false);
+        }
       }
-    } catch (error) {
-      console.error("Cancel order error:", error);
-      alert("An error occurred while cancelling the order.");
-    } finally {
-      setIsCancelling(false);
-    }
+    });
   };
 
   const isReturnEligible = () => {
@@ -534,6 +549,11 @@ export default function OrderDetailPage() {
         </div>
 
       </main>
+      
+      <ConfirmModal
+        {...confirmConfig}
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
