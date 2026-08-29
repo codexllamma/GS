@@ -70,9 +70,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: "Cash on Delivery",
         description: "Pay cash upon delivery",
         serviceable: isServiceable && isCodAvailable,
-        shipping_fee: 0,     // Base shipping cost (0 if free shipping)
+        shipping_fee: 5900,     // Base shipping cost (0 if free shipping)
         cod: true,           // Unlocks the COD payment option
-        cod_fee: 5900,       // ₹59 in paise (The extra COD surcharge)
+        cod_fee: 0,       // ₹59 in paise (The extra COD surcharge)
       });
     }
 
@@ -112,9 +112,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               name: "Cash on Delivery",
               description: "Pay cash upon delivery",
               serviceable: true,
-              shipping_fee: 0, // ₹50
+              shipping_fee: 5900, // ₹50
               cod: true,
-              cod_fee: 5900,
+              cod_fee: 0,
             },
           ],
         },
