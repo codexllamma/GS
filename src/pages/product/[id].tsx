@@ -131,6 +131,16 @@ export default function ProductDetailsPage({ product }: InferGetServerSidePropsT
         }
       }
       
+      if (typeof window !== "undefined" && (window as any).fbq) {
+        (window as any).fbq("track", "ViewContent", {
+          content_name: product.name,
+          content_ids: [product.id],
+          content_type: "product",
+          value: product.basePrice,
+          currency: "INR",
+        });
+      }
+      
       setIsLoading(false);
     };
 
@@ -167,6 +177,16 @@ export default function ProductDetailsPage({ product }: InferGetServerSidePropsT
   const variant = product?.variants.find((v) => v.size === selectedSize);
   if(!product) return;
   if (!variant) return;
+
+  if (typeof window !== "undefined" && (window as any).fbq) {
+    (window as any).fbq("track", "AddToCart", {
+      content_name: product.name,
+      content_ids: [product.id],
+      content_type: "product",
+      value: product.basePrice,
+      currency: "INR"
+    });
+  }
 
   addToCart({
     variantId: variant.id,

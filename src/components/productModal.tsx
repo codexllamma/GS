@@ -263,9 +263,8 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         content_name: product.name,
         content_ids: [product.id],
         content_type: "product",
-        value: activePrice,
+        value: product.basePrice,
         currency: "INR",
-        button_type: "add_to_bag",
       });
     }
 
@@ -327,15 +326,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         content_name: product.name,
         content_ids: [product.id],
         content_type: "product",
-        value: activePrice,
+        value: product.basePrice,
         currency: "INR",
-        button_type: "buy_now",
       });
       (window as any).fbq("track", "InitiateCheckout", {
         content_name: product.name,
         content_ids: [product.id],
         content_type: "product",
-        value: activePrice,
+        value: product.basePrice,
         currency: "INR",
         checkout_type: "instant_buy",
       });

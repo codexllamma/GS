@@ -74,14 +74,17 @@ const OrderConfirmationPage = () => {
 
     // Meta Pixel: Purchase
     if (typeof window !== "undefined" && (window as any).fbq) {
+      const purchasedProductIds = order.orderItems.map(
+        (item) => item.variant?.product?.id || item.variantId
+      );
+
       (window as any).fbq("track", "Purchase", {
-        content_ids: order.orderItems.map(
-          (item) => item.variant?.product?.id || item.variantId
-        ),
+        content_ids: purchasedProductIds,
         content_type: "product",
         value: order.total,
         currency: "INR",
-        num_items: order.orderItems.reduce((sum, item) => sum + item.quantity, 0),
+      }, {
+        eventID: (order as any).razorpayPaymentId
       });
     }
 
