@@ -115,6 +115,7 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
         prefill,
         handler: async function (response: any) {
           const toastId = toast.loading("Verifying payment security...");
+          document.body.classList.add("overflow-hidden");
 
           try {
             const verifyRes = await fetch("/api/razorpay/verify-payment", {
@@ -144,6 +145,8 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
           } catch (err: any) {
             console.error("Verification error:", err);
             toast.error("Network error during payment verification.", { id: toastId });
+          } finally {
+            document.body.classList.remove("overflow-hidden");
           }
         },
         modal: {

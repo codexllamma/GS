@@ -61,7 +61,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { createdAt: "desc" }
         ],
         include: {
-          images: true,
+          images: {
+            where: { isPrimary: true },
+            take: 1,
+          },
           variants: true,
           fabric: {
             include: {

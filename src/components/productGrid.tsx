@@ -36,6 +36,64 @@ export default function ProductsGrid() {
 
   // Ref to store the current AbortController (to cancel old requests)
   const abortControllerRef = useRef<AbortController | null>(null);
+  const bgAbortControllerRef = useRef<AbortController | null>(null);
+
+  const scheduleBackgroundGalleryFetch = useCallback((productIds: string[]) => {
+    if (productIds.length === 0) return;
+
+    if (bgAbortControllerRef.current) {
+      bgAbortControllerRef.current.abort();
+    }
+    
+    const controller = new AbortController();
+    bgAbortControllerRef.current = controller;
+
+    const runBackgroundFetch = async () => {
+      try {
+        const res = await fetch("/api/product/gallery-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productIds }),
+          signal: controller.signal
+        });
+        
+        if (!res.ok) throw new Error("Failed gallery batch");
+        const data = await res.json();
+        const secondaryImages: { id: string; productId: string; url: string; isPrimary: boolean }[] = data.images;
+
+        secondaryImages.forEach((img) => {
+          const warmImg = new window.Image();
+          warmImg.src = img.url;
+        });
+
+        setProducts((currentProducts) =>
+          currentProducts.map((prod) => {
+            if (!productIds.includes(prod.id)) return prod;
+            const extraImages = secondaryImages.filter((img) => img.productId === prod.id);
+            if (extraImages.length === 0) return prod;
+            
+            const existingUrls = new Set(prod.images.map(i => i.url));
+            const newUniqueImages = extraImages.filter(img => !existingUrls.has(img.url)).map(img => ({ url: img.url, isPrimary: img.isPrimary }));
+            
+            return {
+              ...prod,
+              images: [...prod.images, ...newUniqueImages],
+            };
+          })
+        );
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.warn("Background gallery fetch skipped or failed", err);
+        }
+      }
+    };
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(() => runBackgroundFetch(), { timeout: 2000 });
+    } else {
+      setTimeout(runBackgroundFetch, 800);
+    }
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -86,11 +144,15 @@ export default function ProductsGrid() {
 
         setProducts((prev) => {
           // If page 1, completely replace. 
-          if (isFirstPage) return newProducts;
+          if (isFirstPage) {
+            scheduleBackgroundGalleryFetch(newProducts.map((p) => p.id));
+            return newProducts;
+          }
           
           // Deduplicate
           const existingIds = new Set(prev.map((p) => p.id));
           const uniqueNew = newProducts.filter((p) => !existingIds.has(p.id));
+          scheduleBackgroundGalleryFetch(uniqueNew.map((p) => p.id));
           return [...prev, ...uniqueNew];
         });
         
@@ -120,8 +182,11 @@ export default function ProductsGrid() {
       if (abortControllerRef.current) {
          abortControllerRef.current.abort();
       }
+      if (bgAbortControllerRef.current) {
+         bgAbortControllerRef.current.abort();
+      }
     };
-  }, [page, category, search, router.isReady]); // Dependencies
+  }, [page, category, search, router.isReady, scheduleBackgroundGalleryFetch]); // Dependencies
 
   // --- RESET PAGE ON FILTER CHANGE ---
   useEffect(() => {
