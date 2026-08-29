@@ -72,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         serviceable: isServiceable && isCodAvailable,
         shipping_fee: 5900,     // Base shipping cost (0 if free shipping)
         cod: true,           // Unlocks the COD payment option
-        cod_fee: 0,       // ₹59 in paise (The extra COD surcharge)
+        cod_fee: 5900,       // ₹59 in paise (The extra COD surcharge)
       });
     }
 
