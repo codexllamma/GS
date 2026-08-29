@@ -26,7 +26,7 @@ export default function handler(
     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&state=${state}`;
 
-  console.log("Redirecting to:", installUrl);
+
 
   res.redirect(installUrl);
 }

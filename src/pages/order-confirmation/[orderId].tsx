@@ -44,7 +44,7 @@ const OrderConfirmationPage = () => {
         const res = await axios.get(`/api/orders/${orderId}?intent=confirmation`);
         setOrder(res.data);
       } catch (error) {
-        console.error("Error fetching confirmation order:", error);
+
       } finally {
         setLoading(false);
       }

@@ -112,7 +112,7 @@ export default function AdminOrders() {
         setOrders(data);
       }
     } catch (error) {
-      console.error("Failed to fetch orders", error);
+
     } finally {
       setLoading(false);
     }
@@ -148,6 +148,8 @@ export default function AdminOrders() {
 
   // --- ACTION HANDLERS ---
   const updateStatus = async (orderId: string, newStatus: string) => {
+    setProgressModal({ isOpen: true, title: "Updating Status", progress: 0, total: 1, logs: [], isFinished: false });
+    addLog(`Updating order ${orderId} to ${newStatus}...`);
     try {
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: "PUT",
@@ -157,17 +159,21 @@ export default function AdminOrders() {
 
       if (res.ok) {
         setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
+        addLog(`✅ Status updated successfully!`, "success");
+      } else {
+        addLog(`❌ Failed to update status: Server error`, "error");
       }
     } catch (error) {
-      console.error(error);
-      alert("Failed to update status");
+      addLog(`❌ Failed to update status`, "error");
+    } finally {
+      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
     }
   };
 
   const handleBatchSplit = async () => {
     const pendingOrders = orders.filter(o => o.shipments.length === 0);
     if (pendingOrders.length === 0) {
-      alert("No pending orders require splitting.");
+      setProgressModal({ isOpen: true, title: "Batch Splitting Orders", progress: 1, total: 1, logs: [{ message: "No pending orders require splitting.", type: "info" }], isFinished: true });
       return;
     }
     if (!confirm(`Run auto-split for ${pendingOrders.length} orders?`)) return;
@@ -207,7 +213,7 @@ export default function AdminOrders() {
   const handleBatchAssignAwb = async () => {
     const pendingShipments = orders.flatMap(o => o.shipments.filter(s => !s.awbCode));
     if (pendingShipments.length === 0) {
-      alert("No pending shipments require AWB assignment.");
+      setProgressModal({ isOpen: true, title: "Batch Assigning AWBs", progress: 1, total: 1, logs: [{ message: "No pending shipments require AWB assignment.", type: "info" }], isFinished: true });
       return;
     }
     if (!confirm(`Assign AWBs for ${pendingShipments.length} shipments?`)) return;
@@ -342,7 +348,7 @@ export default function AdminOrders() {
       a.click();
       addLog(`✅ Batch labels downloaded successfully!`, "success");
     } catch (err: any) {
-      console.error(err);
+
       addLog(`❌ Failed to download labels: ${err.message}`, "error");
     } finally {
       setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));

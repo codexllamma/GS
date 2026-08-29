@@ -47,7 +47,7 @@ export default function ComingSoonLanding() {
           ]);
         }
       } catch (err) {
-        console.error("Failed to load hero images", err);
+
       }
     })();
   }, []);

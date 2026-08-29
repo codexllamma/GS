@@ -184,7 +184,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         setCurrentImage(0);
         x.set(0);
       } catch (err) {
-        console.error("Modal Product Fetch Error:", err);
+
         toast.error("Could not load product details.");
         onClose();
       } finally {

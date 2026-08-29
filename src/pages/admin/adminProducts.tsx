@@ -62,7 +62,7 @@ export default function AdminProductsPage() {
     fetch("/api/admin/products")
       .then((res) => res.json())
       .then(setProducts)
-      .catch(console.error);
+      .catch(() => {});
   }, []);
 
   const handleCreate = async (data: any) => {

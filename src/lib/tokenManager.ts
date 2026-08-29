@@ -21,7 +21,7 @@ async function loginToXpressBees(): Promise<string> {
     { headers: { "Content-Type": "application/json" } }
   );
 
-  console.log("🔍 XpressBees login raw response:", response.data);
+
 
   const rawData = response.data?.data;
 
@@ -44,7 +44,7 @@ async function loginToXpressBees(): Promise<string> {
   tokenExpiry = Date.now() + (expiresInSeconds ? expiresInSeconds * 1000 : DEFAULT_TOKEN_TTL_MS);
   cachedToken = token;
 
-  console.log("🔐 XpressBees token refreshed:", token.substring(0, 20) + "...");
++ "...");
 
   return token;
 }

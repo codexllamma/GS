@@ -55,7 +55,7 @@ export default function LandingPage() {
            setLookbookImages(data);
         }
       } catch (err) {
-        console.error("Hero Load Error:", err);
+
       }
     })();
   }, [isMobile]);

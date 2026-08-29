@@ -70,7 +70,7 @@ export default function CheckoutPage() {
           setCartItems(hydratedCart);
         }
       } catch (e) {
-        console.error("Cart loading error:", e);
+
       } finally {
         setLoading(false);
       }
@@ -93,12 +93,12 @@ export default function CheckoutPage() {
     
   const handleCheckout = async () => {
     if (!pincode || pincode.trim().length === 0) {
-      alert("Please enter a valid PIN code.");
+      toast.error("Please enter a valid PIN code.");
       return;
     }
 
     if (cartItems.length === 0) {
-      alert("Your cart is empty.");
+      toast.error("Your cart is empty.");
       return;
     }
 
@@ -171,8 +171,7 @@ export default function CheckoutPage() {
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
     } catch (err: any) {
-      console.error("Checkout failed:", err);
-      alert(err?.message || "Checkout failed.");
+      toast.error(err?.message || "Checkout failed.");
       setIsSubmitting(false);
     }
   };

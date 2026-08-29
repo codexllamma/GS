@@ -5,7 +5,7 @@ const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 const locationId = process.env.SHOPIFY_LOCATION_ID;
 
 async function testShopifyConnection() {
-  console.log('Testing Shopify GraphQL Admin API connection...\n');
+
 
   if (!domain || !token || !locationId) {
     console.error('❌ Missing environment variables in .env:');
@@ -64,23 +64,23 @@ async function testShopifyConnection() {
 
     const { shop, location, products } = result.data;
 
-    console.log(' Store Connected:');
-    console.log(`   - Name: ${shop.name}`);
-    console.log(`   - Domain: ${shop.myshopifyDomain}`);
-    console.log(`   - Plan: ${shop.plan.displayName}`);
-    console.log(`   - Currency: ${shop.currencyCode}`);
+
+
+
+
+
 
     if (location) {
-      console.log('\n Location Verified:');
-      console.log(`   - Name: ${location.name}`);
-      console.log(`   - ID: ${location.id}`);
-      console.log(`   - Active: ${location.isActive}`);
+
+
+
+
     } else {
       console.warn('\n⚠️ Location ID did not return a valid location. Double-check your SHOPIFY_LOCATION_ID.');
     }
 
-    console.log(`\n Access Scopes: Product access working (${products.nodes.length} existing products found).`);
-    console.log('\n All credentials are valid. Ready for sync.');
+.`);
+
   } catch (err) {
     console.error('❌ Connection failed:', err);
   }

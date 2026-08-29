@@ -45,7 +45,7 @@ export default function Hero() {
           setBestsellers(data);
         }
       } catch (err) {
-        console.error("Failed to load bestsellers:", err);
+
       } finally {
         setLoadingBestsellers(false);
       }

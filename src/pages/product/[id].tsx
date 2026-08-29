@@ -81,7 +81,7 @@ export const getServerSideProps: GetServerSideProps<{ product: Product | null }>
       props: { product: JSON.parse(JSON.stringify(product)) },
     };
   } catch (error) {
-    console.error("Product fetch error:", error);
+
     return { notFound: true };
   }
 };

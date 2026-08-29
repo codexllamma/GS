@@ -215,9 +215,9 @@ export async function executeOrderSplit(internalOrderId: string) {
         body: JSON.stringify({ ids: toCancelIds }),
       });
       const cancelData = await cancelRes.json();
-      console.log(`[SHIPROCKET CLEANUP]: Cancelled raw channel master order ID(s) ${toCancelIds.join(", ")}:`, cancelData);
+${toCancelIds.join(", ")}:`, cancelData);
     } else {
-      console.log(`[SHIPROCKET CLEANUP]: No un-cancelled master order found matching '${rawOrderId}'.`);
+
     }
   } catch (e) {
     console.warn("[SHIPROCKET MASTER CLEANUP WARN]: Master order cancellation skipped.", e);

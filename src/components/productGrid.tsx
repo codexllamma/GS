@@ -83,7 +83,7 @@ export default function ProductsGrid() {
         );
       } catch (err: any) {
         if (err.name !== "AbortError") {
-          console.warn("Background gallery fetch skipped or failed", err);
+
         }
       }
     };
@@ -161,9 +161,9 @@ export default function ProductsGrid() {
       } catch (err: any) {
         if (err.name === 'AbortError') {
           // Ignore aborted requests (this is normal behavior)
-          console.log("Request aborted"); 
+
         } else {
-          console.error(err);
+
           setError("Could not load products.");
         }
       } finally {

@@ -26,9 +26,9 @@ export default async function handler(
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  console.log("\n=======================================================");
-  console.log("🚀 STARTING BULK SHOPIFY PRODUCT & INVENTORY SYNC");
-  console.log("=======================================================\n");
+
+
+
 
   const startTime = Date.now();
 
@@ -50,7 +50,7 @@ export default async function handler(
     const total = products.length;
 
     if (total === 0) {
-      console.log("⚠️  No active products found in the database to sync.");
+
       return res.status(200).json({
         success: true,
         message: "No active products found in the database to sync.",
@@ -60,7 +60,7 @@ export default async function handler(
       });
     }
 
-    console.log(`📦 Found ${total} product(s) to synchronize.\n`);
+to synchronize.\n`);
 
     const successes: SyncSuccess[] = [];
     const failures: SyncFailure[] = [];
@@ -70,7 +70,7 @@ export default async function handler(
       const { id, name } = products[i];
       const progress = `[${i + 1}/${total}]`;
 
-      console.log(`${progress} 🔄 Syncing: "${name}" (ID: ${id})...`);
+...`);
 
       try {
         const shopifyProduct = await syncProduct(id);
@@ -107,23 +107,23 @@ export default async function handler(
     // 3. Terminal Summary Report
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
-    console.log("\n=======================================================");
-    console.log("📊 SYNC COMPLETED SUMMARY REPORT");
-    console.log("=======================================================");
-    console.log(`⏱️  Total Duration : ${duration}s`);
-    console.log(`📦 Total Products : ${total}`);
-    console.log(`✅ Successful     : ${successes.length}`);
-    console.log(`❌ Failed         : ${failures.length}`);
+
+
+
+
+
+
+
 
     if (failures.length > 0) {
-      console.log("\n🚨 Failed Products Breakdown:");
+
       failures.forEach((f, idx) => {
         console.log(
           `   ${idx + 1}. [${f.id}] "${f.name}"\n     Reason: ${f.error}`
         );
       });
     }
-    console.log("=======================================================\n");
+
 
     // 4. Return HTTP Response
     return res.status(200).json({

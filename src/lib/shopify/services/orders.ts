@@ -43,7 +43,7 @@ mutation OrderCreate(
 export async function syncShopifyOrder(
   payload: OrderCreateInput
 ): Promise<ShopifyOrder> {
-  console.log("[SHOPIFY SYNC] Sending Order Payload:", JSON.stringify(payload, null, 2));
+);
 
   const response = await shopify.graphql<OrderCreateResponse>(
     ORDER_CREATE_MUTATION,
@@ -73,6 +73,6 @@ export async function syncShopifyOrder(
     throw new Error("Shopify did not return an order.");
   }
 
-  console.log(`[SHOPIFY SYNC SUCCESS] Order Created: #${result.order.number} (${result.order.id})`);
+`);
   return result.order;
 }

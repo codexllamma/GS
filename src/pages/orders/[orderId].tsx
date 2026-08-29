@@ -88,7 +88,7 @@ export default function OrderDetailPage() {
       
       if (res.status === 401 || res.status === 403) {
         // Optional: Redirect to login or unauthorized page
-        console.warn("Unauthorized access to order details.");
+
         return;
       }
 
@@ -97,7 +97,7 @@ export default function OrderDetailPage() {
         setOrder(data);
       }
     } catch (error) {
-      console.error("Error fetching order details:", error);
+
     } finally {
       setLoading(false);
     }

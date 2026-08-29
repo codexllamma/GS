@@ -20,7 +20,7 @@ export async function sendVerificationEmail(email: string, url: string) {
         </div>
       `,
     });
-    console.log(`Verification email sent to ${email}`);
+
   } catch (err) {
     console.error("Failed to send email:", err);
   }

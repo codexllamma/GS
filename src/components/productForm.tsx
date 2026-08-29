@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { X, Upload } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface ProductFormProps {
   initialData?: any;
@@ -76,7 +77,7 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
 
   // --- FETCH OPTIONS ---
   useEffect(() => {
-    fetch("/api/categories").then(res => res.json()).then(setCategories).catch(console.error);
+    fetch("/api/categories").then(res => res.json()).then(setCategories).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
     fetch(`/api/fabrics?categoryId=${selectedCategory}`)
       .then(res => res.json())
       .then(setFabrics)
-      .catch(console.error);
+      .catch(() => {});
   }, [selectedCategory]);
 
   // --- HANDLERS ---
@@ -115,8 +116,8 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
       setUploadedImages(prev => [...prev, ...newUrls]);
       setIsDirty(true);
     } catch (err) {
-      console.error("Upload failed:", err);
-      alert("Upload failed.");
+
+      toast.error("Upload failed.");
     } finally {
       setUploading(false);
     }
@@ -168,8 +169,8 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
       });
       setIsDirty(false);
     } catch (err) {
-      console.error(err);
-      alert("Save failed");
+
+      toast.error("Save failed");
     } finally {
       setSaving(false);
     }
@@ -184,11 +185,11 @@ export default function ProductForm({ initialData, onSubmit, onCancel }: Product
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId: initialData.id }),
       });
-      if (res.ok) alert("Product synced to Shopify successfully!");
-      else alert("Failed to sync product to Shopify");
+      if (res.ok) toast.success("Product synced to Shopify successfully!");
+      else toast.error("Failed to sync product to Shopify");
     } catch (err) {
-      console.error(err);
-      alert("Failed to sync product to Shopify");
+
+      toast.error("Failed to sync product to Shopify");
     } finally {
       setSyncing(false);
     }

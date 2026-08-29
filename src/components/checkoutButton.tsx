@@ -24,6 +24,8 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
 
   const pricing = calculateCartPricing(items);
 
+  const [verifying, setVerifying] = useState(false);
+
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
       if (window.Razorpay) {
@@ -114,7 +116,7 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
         description: "Order Checkout",
         prefill,
         handler: async function (response: any) {
-          const toastId = toast.loading("Verifying payment security...");
+          setVerifying(true);
           document.body.classList.add("overflow-hidden");
 
           try {
@@ -132,7 +134,9 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
             const verifyData = await verifyRes.json();
 
             if (!verifyRes.ok || !verifyData.success) {
-              toast.error(verifyData.message || "Payment verification failed.", { id: toastId });
+              toast.error(verifyData.message || "Payment verification failed.");
+              setVerifying(false);
+              document.body.classList.remove("overflow-hidden");
               return;
             }
 
@@ -140,12 +144,10 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
               clearPurchasedItems(verifyData.purchasedVariantIds);
             }
 
-            toast.success("Payment verified successfully!", { id: toastId });
             window.location.href = `/order-confirmation/${verifyData.orderId}`;
           } catch (err: any) {
-            console.error("Verification error:", err);
-            toast.error("Network error during payment verification.", { id: toastId });
-          } finally {
+            toast.error("Network error during payment verification.");
+            setVerifying(false);
             document.body.classList.remove("overflow-hidden");
           }
         },
@@ -160,7 +162,6 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
       const paymentObject = new window.Razorpay(options);
       paymentObject.open();
     } catch (error: any) {
-      console.error("Checkout trigger error:", error);
       toast.error(error.message || "Could not start checkout");
     } finally {
       setLoading(false);
@@ -168,16 +169,29 @@ export const CheckoutButton: React.FC<CheckoutButtonProps> = ({ items }) => {
   };
 
   return (
-    <button
-      onClick={handleCheckout}
-      disabled={loading || items.length === 0}
-      className="w-full bg-brand-btn text-white text-[11px] font-semibold uppercase tracking-widest py-3.5 rounded-sm hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
-    >
-      {loading ? (
-        "Opening Razorpay..."
-      ) : (
-        <span>Proceed to Payment · ₹{pricing.finalTotal.toLocaleString("en-IN")}</span>
+    <>
+      <button
+        onClick={handleCheckout}
+        disabled={loading || items.length === 0}
+        className="w-full bg-brand-btn text-white text-[11px] font-semibold uppercase tracking-widest py-3.5 rounded-sm hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+      >
+        {loading ? (
+          "Opening Razorpay..."
+        ) : (
+          <span>Proceed to Payment · ₹{pricing.finalTotal.toLocaleString("en-IN")}</span>
+        )}
+      </button>
+
+      {verifying && (
+        <div className="fixed inset-0 z-[9999] bg-brand-bg/90 backdrop-blur-sm flex flex-col items-center justify-center text-brand-charcoal">
+          <svg className="animate-spin h-8 w-8 text-brand-charcoal mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
+            <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <h2 className="font-serif text-lg md:text-xl tracking-widest uppercase mb-2">Verifying Payment</h2>
+          <p className="font-sans text-[11px] text-brand-textSec tracking-wide uppercase">Please do not close or refresh this page.</p>
+        </div>
       )}
-    </button>
+    </>
   );
 };

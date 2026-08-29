@@ -99,7 +99,7 @@ export async function syncFulfillmentToShopify(shipmentId: string) {
     throw new Error(`Failed to create Shopify fulfillment: ${JSON.stringify(createFulfillmentData)}`);
   }
 
-  console.log(`[SHOPIFY FULFILLMENT SYNCED]: Order #${shopifyNumericId}, AWB=${shipment.awbCode}`);
+
 
   return { success: true, fulfillment: createFulfillmentData.fulfillment };
 }

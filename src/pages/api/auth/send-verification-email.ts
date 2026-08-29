@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const verifyUrl = `${process.env.NEXTAUTH_URL}/api/auth/verify-email?token=${token}`;
 
-    console.log("Verification URL:", verifyUrl); 
+
 
     // Send the actual email
     const response = await resend.emails.send({
@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `,
     });
 
-    console.log("Resend API response:", response);
+
 
     return res.status(200).json({ message: "Verification email sent" });
   } catch (error) {

@@ -30,9 +30,9 @@ export default async function handler(
 
     const data = await response.json();
 
-    console.log("========== ACCESS TOKEN ==========");
-    console.log(data);
-    console.log("==================================");
+
+
+
 
     return res.status(200).json(data);
   } catch (err) {
