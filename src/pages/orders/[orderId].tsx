@@ -17,6 +17,7 @@ import {
   Mail,
   HelpCircle,
   Clock,
+  XCircle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -78,39 +79,72 @@ export default function OrderDetailPage() {
   const { orderId } = router.query;
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
-  if (!orderId) return;
+    if (!orderId) return;
 
-  const fetchOrder = async () => {
-    try {
-      const res = await fetch(`/api/orders/${orderId}`);
-      
-      if (res.status === 401 || res.status === 403) {
-        // Optional: Redirect to login or unauthorized page
+    const fetchOrder = async () => {
+      try {
+        const res = await fetch(`/api/orders/${orderId}`);
 
-        return;
+        if (res.status === 401 || res.status === 403) {
+          // Optional: Redirect to login or unauthorized page
+          return;
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          setOrder(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch order:", error);
+      } finally {
+        setLoading(false);
       }
+    };
+
+    fetchOrder();
+  }, [orderId]);
+
+  const handleCancelOrder = async () => {
+    if (!window.confirm("Are you sure you want to cancel this order? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsCancelling(true);
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+      });
+      
+      const data = await res.json();
 
       if (res.ok) {
-        const data = await res.json();
-        setOrder(data);
+        // Optimistically update the local state to show 'Cancelled' immediately
+        setOrder((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
+      } else {
+        alert(data.message || "Failed to cancel order.");
       }
     } catch (error) {
-
+      console.error("Cancel order error:", error);
+      alert("An error occurred while cancelling the order.");
     } finally {
-      setLoading(false);
+      setIsCancelling(false);
     }
   };
-
-  fetchOrder();
-}, [orderId]);
 
   const isReturnEligible = () => {
     if (!order) return false;
     const baseDate = order.deliveredAt ? new Date(order.deliveredAt) : new Date(order.createdAt);
     const diffHours = (new Date().getTime() - baseDate.getTime()) / (1000 * 60 * 60);
     return diffHours <= 72 && order.status.toUpperCase() !== "CANCELLED";
+  };
+
+  const isCancellable = () => {
+    if (!order) return false;
+    const unCancellableStatuses = ["CANCELLED", "SHIPPED", "IN_TRANSIT", "DELIVERED"];
+    return !unCancellableStatuses.includes(order.status.toUpperCase());
   };
 
   const getStatusBadge = (status: string) => {
@@ -232,25 +266,46 @@ export default function OrderDetailPage() {
 
             {/* Mobile-Friendly CTAs */}
             <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
-              {shiprocketTrackingUrl ? (
-                <a
-                  href={shiprocketTrackingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto h-9 px-3.5 bg-white border border-brand-border hover:border-brand-charcoal text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99] cursor-pointer"
-                >
-                  <Truck size={13} className="stroke-[1.6]" />
-                  <span>Track Shipment</span>
-                  <ExternalLink size={11} className="text-brand-textSec" />
-                </a>
-              ) : (
-                <div className="w-full sm:w-auto h-9 px-3 bg-brand-stone/20 text-brand-textSec text-[10px] font-semibold uppercase tracking-widest rounded-sm flex items-center justify-center gap-1.5 select-none">
-                  <Clock size={12} />
-                  <span>To Be Shipped</span>
-                </div>
+              {order.status.toUpperCase() !== "CANCELLED" && (
+                shiprocketTrackingUrl ? (
+                  <a
+                    href={shiprocketTrackingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:w-auto h-9 px-3.5 bg-white border border-brand-border hover:border-brand-charcoal text-brand-charcoal text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99] cursor-pointer"
+                  >
+                    <Truck size={13} className="stroke-[1.6]" />
+                    <span>Track Shipment</span>
+                    <ExternalLink size={11} className="text-brand-textSec" />
+                  </a>
+                ) : (
+                  <div className="w-full sm:w-auto h-9 px-3 bg-brand-stone/20 text-brand-textSec text-[10px] font-semibold uppercase tracking-widest rounded-sm flex items-center justify-center gap-1.5 select-none">
+                    <Clock size={12} />
+                    <span>To Be Shipped</span>
+                  </div>
+                )
               )}
 
-              {isReturnEligible() ? (
+              {/* Dynamic Action Button: Cancel vs Return vs Cancelled Badge */}
+              {order.status.toUpperCase() === "CANCELLED" ? (
+                <div className="w-full sm:w-auto h-9 px-3 bg-red-50 text-red-600 border border-red-100 text-[10px] font-semibold uppercase tracking-widest rounded-sm flex items-center justify-center gap-1.5 select-none">
+                  <XCircle size={12} className="stroke-[1.6]" />
+                  <span>Order Cancelled</span>
+                </div>
+              ) : isCancellable() ? (
+                <button
+                  onClick={handleCancelOrder}
+                  disabled={isCancelling}
+                  className="w-full sm:w-auto h-9 px-3.5 bg-brand-card hover:bg-red-50 border border-brand-border hover:border-red-200 text-brand-charcoal hover:text-red-600 text-[10px] font-semibold uppercase tracking-widest rounded-sm transition flex items-center justify-center gap-1.5 shadow-xs active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {isCancelling ? (
+                    <Loader2 size={12} className="animate-spin stroke-[1.6]" />
+                  ) : (
+                    <XCircle size={12} className="stroke-[1.6]" />
+                  )}
+                  <span>{isCancelling ? "Cancelling..." : "Cancel Order"}</span>
+                </button>
+              ) : isReturnEligible() ? (
                 <a
                   href={shiprocketReturnUrl}
                   target="_blank"
@@ -307,7 +362,7 @@ export default function OrderDetailPage() {
                 Logistics Partner
               </span>
               <span className="text-[11px] sm:text-xs font-medium text-brand-charcoal mt-0.5 block truncate">
-                {order.courierName || "Shiprocket Express"}
+                {order.status.toUpperCase() === "CANCELLED" ? "N/A" : order.courierName || "Shiprocket Express"}
               </span>
             </div>
 
@@ -316,7 +371,7 @@ export default function OrderDetailPage() {
                 AWB Consignment
               </span>
               <span className="text-[11px] sm:text-xs font-medium text-brand-charcoal mt-0.5 block truncate">
-                {order.awbCode || "Generating..."}
+                {order.status.toUpperCase() === "CANCELLED" ? "Voided" : order.awbCode || "Generating..."}
               </span>
             </div>
           </div>
@@ -341,7 +396,7 @@ export default function OrderDetailPage() {
               const unitPrice = item.priceAtPurchase || item.price || 0;
 
               return (
-                <div key={item.id} className="py-3 first:pt-0 last:pb-0 flex items-start sm:items-center gap-3 sm:gap-4">
+                <div key={item.id} className={`py-3 first:pt-0 last:pb-0 flex items-start sm:items-center gap-3 sm:gap-4 ${order.status.toUpperCase() === "CANCELLED" ? "opacity-60" : ""}`}>
                   {/* Thumbnail */}
                   <div className="w-14 sm:w-16 h-18 sm:h-20 bg-brand-stone/30 rounded-sm overflow-hidden flex-shrink-0 border border-brand-border">
                     <img
@@ -370,7 +425,7 @@ export default function OrderDetailPage() {
 
                   {/* Price */}
                   <div className="text-right flex-shrink-0">
-                    <span className="text-xs sm:text-sm font-semibold text-brand-charcoal">
+                    <span className={`text-xs sm:text-sm font-semibold ${order.status.toUpperCase() === "CANCELLED" ? "text-brand-textSec line-through" : "text-brand-charcoal"}`}>
                       ₹{(unitPrice * item.quantity).toLocaleString("en-IN")}
                     </span>
                     {item.quantity > 1 && (
@@ -412,7 +467,7 @@ export default function OrderDetailPage() {
             </div>
 
             <div className="pt-2.5 mt-3 border-t border-brand-border/60 flex items-center gap-1.5 text-[10px] sm:text-[11px] text-brand-textSec">
-              <ShieldCheck size={13} className="text-brand-olive flex-shrink-0" />
+              <ShieldCheck size={13} className={`${order.status.toUpperCase() === "CANCELLED" ? "text-brand-textSec" : "text-brand-olive"} flex-shrink-0`} />
               <span>Complimentary insured shipping</span>
             </div>
           </div>
@@ -425,14 +480,14 @@ export default function OrderDetailPage() {
 
             <div className="flex justify-between text-xs text-brand-textSec font-light">
               <span>Subtotal</span>
-              <span className="text-brand-charcoal font-medium">
+              <span className={`font-medium ${order.status.toUpperCase() === "CANCELLED" ? "line-through" : "text-brand-charcoal"}`}>
                 ₹{(order.subtotal || order.total).toLocaleString("en-IN")}
               </span>
             </div>
 
             <div className="flex justify-between text-xs text-brand-textSec font-light">
               <span>Shipping & Logistics</span>
-              <span className="text-brand-olive font-medium uppercase text-[9px] sm:text-[10px] tracking-wider">
+              <span className={`font-medium uppercase text-[9px] sm:text-[10px] tracking-wider ${order.status.toUpperCase() === "CANCELLED" ? "line-through text-brand-textSec" : "text-brand-olive"}`}>
                 Complimentary
               </span>
             </div>
@@ -444,9 +499,9 @@ export default function OrderDetailPage() {
 
             <div className="pt-2 border-t border-brand-border flex justify-between items-baseline">
               <span className="text-xs font-semibold uppercase tracking-wider text-brand-charcoal">
-                Total Paid
+                {order.status.toUpperCase() === "CANCELLED" ? "Refunded / Voided" : "Total Paid"}
               </span>
-              <span className="font-serif text-base sm:text-lg font-semibold text-brand-charcoal">
+              <span className={`font-serif text-base sm:text-lg font-semibold ${order.status.toUpperCase() === "CANCELLED" ? "text-red-600" : "text-brand-charcoal"}`}>
                 ₹{order.total.toLocaleString("en-IN")}
               </span>
             </div>
