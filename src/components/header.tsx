@@ -108,29 +108,26 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      {/* ---------------- 1. TOP ANNOUNCEMENT BANNER ---------------- */}
-      {/* ---------------- 1. INFINITE ROTATING ANNOUNCEMENT BANNER ---------------- */}
-{/* ---------------- 1. INFINITE ROTATING ANNOUNCEMENT BANNER ---------------- */}
-<div className="relative z-50 w-full bg-brand-charcoal text-brand-bg text-[9px] xs:text-[10px] sm:text-[11px] tracking-[0.16em] uppercase py-1.5 overflow-hidden select-none whitespace-nowrap">
-  <div className="flex w-max items-center animate-marquee hover:[animation-play-state:paused]">
-    {[...Array(8)].map((_, i) => (
-      <div key={i} className="flex items-center gap-3 px-3 font-medium">
-        <span>2% Off on Prepaid • 3% Off on 2 Items • 5% Off on 3+ Items (Auto applied)</span>
-        <span>2% Off on Prepaid • 3% Off on 2 Items • 5% Off on 3+ Items (Auto applied)</span>
-
-      </div>
-    ))}
-  </div>
-</div>
-
-      {/* ---------------- 2. STICKY TRANSPARENT NAVBAR ---------------- */}
+      {/* ---------------- 1. STICKY TRANSPARENT NAVBAR & BANNER ---------------- */}
       <header
-        className={`sticky top-0 z-40 w-full select-none transition-colors duration-300 ${
+        className={`sticky top-0 z-50 w-full select-none transition-colors duration-300 ${
           isNavbarActive
             ? "bg-white border-b border-brand-border shadow-sm"
             : "bg-transparent border-b border-transparent"
         }`}
       >
+        {/* ---------------- 1. INFINITE ROTATING ANNOUNCEMENT BANNER ---------------- */}
+        <div className="relative z-50 w-full bg-brand-charcoal text-brand-bg text-[9px] xs:text-[10px] sm:text-[11px] tracking-[0.16em] uppercase py-1.5 overflow-hidden select-none whitespace-nowrap">
+          <div className="flex w-max items-center animate-marquee hover:[animation-play-state:paused]">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-3 font-medium">
+                <span>2% Off on Prepaid • 3% Off on 2 Items • 5% Off on 3+ Items (Auto applied)</span>
+                <span>2% Off on Prepaid • 3% Off on 2 Items • 5% Off on 3+ Items (Auto applied)</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="max-w-7xl mx-auto px-5 sm:px-10 md:px-16">
           <div className="relative flex items-center justify-between h-16">
             {/* Left: Brand Logo */}
