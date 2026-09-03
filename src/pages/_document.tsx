@@ -5,6 +5,7 @@ export default function Document() {
     <Html lang="en">
       <Head>
         <meta name="google-site-verification" content="dt_8Ys82IHR3jaj2Niv4s4K1bkEXV8yG2o_viodWdUs" />
+        <meta name="google-site-verification" content="CwVWD7LDa446xV8mioWTx5WQ4GgY2dODuh136yanRHM" />
         <link rel="icon" href="/icon.png" type="image/png" />
       </Head>
       <body className="antialiased">
