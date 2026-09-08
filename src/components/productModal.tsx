@@ -61,6 +61,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [currentImage, setCurrentImage] = useState(0);
+  const [showSizeGuide, setShowSizeGuide] = useState(false);
+
+  const getSizeGuideImage = () => {
+    if (!product) return "/size-guide-polos.jpg";
+    const cat = product.fabric?.category?.name?.toLowerCase() || "";
+    const name = product.name?.toLowerCase() || "";
+
+    if (cat.includes("shirt") || name.includes("shirt")) return "/size-guide-shirts.jpeg";
+    if (cat.includes("trouser") || name.includes("trouser") || cat.includes("pant") || name.includes("pant") || cat.includes("chinos") || name.includes("chinos")) return "/size-guide-trousers.jpeg";
+    return "/size-guide-polos.jpeg";
+  };
 
   // Swipe gesture refs and motion value
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -394,6 +405,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   };
 
   return (
+    <>
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-5 sm:p-5 md:p-6 overflow-y-auto">
         {/* Backdrop */}
@@ -556,11 +568,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                       </label>
                       <button
                         type="button"
-                        onClick={() =>
-                          toast("Standard regular fit. Order your usual size.", {
-                            icon: "📏",
-                          })
-                        }
+                        onClick={() => setShowSizeGuide(true)}
                         className="text-[11px] font-medium text-brand-textSec underline underline-offset-2 hover:text-brand-charcoal transition-colors cursor-pointer"
                       >
                         Size Guide
@@ -758,5 +766,28 @@ export const ProductModal: React.FC<ProductModalProps> = ({
         </motion.div>
       </div>
     </AnimatePresence>
+      {showSizeGuide && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowSizeGuide(false)} />
+          <div className="relative bg-white rounded-md shadow-2xl p-4 max-w-2xl w-full flex flex-col max-h-[95vh]">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold uppercase tracking-widest text-brand-charcoal">Size Guide</h3>
+              <button onClick={() => setShowSizeGuide(false)} className="text-gray-500 hover:text-black">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="relative flex-1 overflow-auto bg-gray-50 rounded-sm">
+              <Image 
+                src={getSizeGuideImage()} 
+                alt="Size Guide" 
+                width={800} 
+                height={800} 
+                className="w-full h-auto object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
