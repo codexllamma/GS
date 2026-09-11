@@ -247,3 +247,33 @@ export async function executeOrderSplit(internalOrderId: string) {
 
   return { success: true, shipments: createdShipments };
 }
+
+// --- NEW FUNCTION INJECTED HERE ---
+export async function scheduleShiprocketPickup(shiprocketShipmentId: string | number) {
+  const token = await getShiprocketToken();
+
+  const res = await fetch("https://apiv2.shiprocket.in/v1/external/courier/generate/pickup", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      // The API requires an array of shipment IDs, even for a single package
+      shipment_id: [Number(shiprocketShipmentId)], 
+    }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || data.pickup_status === 0) {
+    throw new Error(`Pickup scheduling failed: ${data.message || JSON.stringify(data)}`);
+  }
+
+  return {
+    success: true,
+    pickupTokenNumber: data.response?.pickup_token_number,
+    scheduledDate: data.response?.pickup_date,
+    message: data.message
+  };
+}

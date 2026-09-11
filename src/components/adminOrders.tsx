@@ -20,7 +20,8 @@ import {
   MapPin,
   CreditCard,
   Building,
-  X
+  X,
+  CalendarDays
 } from "lucide-react";
 import ConfirmModal from "@/components/confirmModal";
 import { motion, AnimatePresence } from "framer-motion";
@@ -78,7 +79,7 @@ export default function AdminOrders() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [activeTabs, setActiveTabs] = useState<Record<string, "items" | "shipments" | "customer">>({});
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ACTIVE"); // Defaults to hiding completed/cancelled
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -129,7 +130,7 @@ export default function AdminOrders() {
         setOrders(data);
       }
     } catch (error) {
-
+      console.error(error);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -187,8 +188,9 @@ export default function AdminOrders() {
     }
   };
 
+  // --- GLOBAL BATCH HANDLERS ---
   const handleBatchSplit = async () => {
-    const pendingOrders = orders.filter(o => o.shipments.length === 0);
+    const pendingOrders = orders.filter(o => o.shipments.length === 0 && o.status !== "CANCELLED");
     if (pendingOrders.length === 0) {
       setProgressModal({ isOpen: true, title: "Batch Splitting Orders", progress: 1, total: 1, logs: [{ message: "No pending orders require splitting.", type: "info" }], isFinished: true });
       return;
@@ -282,6 +284,30 @@ export default function AdminOrders() {
     });
   };
 
+  const downloadLabels = async () => {
+    setProcessingId("DOWNLOAD_LABELS");
+    setProgressModal({ isOpen: true, title: "Downloading Labels", progress: 0, total: 1, logs: [], isFinished: false });
+    addLog(`Generating batch label PDF for today...`);
+    try {
+      const res = await fetch("/api/admin/labels/download-today");
+      if (!res.ok) throw new Error("Download failed");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `labels-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      addLog(`✅ Batch labels downloaded successfully!`, "success");
+    } catch (err: any) {
+      addLog(`❌ Failed to download labels: ${err.message}`, "error");
+    } finally {
+      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
+      setProcessingId(null);
+    }
+  };
+
+  // --- PER-ORDER HANDLERS ---
   const handleSingleSplit = async (orderId: string) => {
     setProcessingId(`SPLIT-${orderId}`);
     setProgressModal({ isOpen: true, title: "Splitting Order", progress: 0, total: 1, logs: [], isFinished: false });
@@ -325,6 +351,98 @@ export default function AdminOrders() {
     }
   };
 
+  // --- NEW: ORDER-LEVEL BATCH HANDLERS ---
+  const handleOrderBatchAssignAwb = async (order: Order) => {
+    const pendingShipments = order.shipments.filter(s => !s.awbCode);
+    if (pendingShipments.length === 0) {
+      setProgressModal({ isOpen: true, title: "Order AWBs", progress: 1, total: 1, logs: [{ message: "All shipments in this order already have AWBs.", type: "info" }], isFinished: true });
+      return;
+    }
+
+    setProcessingId(`ORDER-AWB-${order.id}`);
+    setProgressModal({ isOpen: true, title: "Assigning AWBs", progress: 0, total: pendingShipments.length, logs: [], isFinished: false });
+    
+    let processed = 0;
+    for (let i = 0; i < pendingShipments.length; i++) {
+      const shipment = pendingShipments[i];
+      addLog(`[${i+1}/${pendingShipments.length}] Assigning AWB for package ${shipment.shiprocketOrderId}...`);
+      try {
+        const res = await fetch(`/api/admin/shipments/${shipment.id}/assign-awb`, { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+          processed++;
+          addLog(`✅ Assigned AWB ${data.shipment.awbCode}`, "success");
+        } else {
+          addLog(`❌ Failed: ${data.message}`, "error");
+        }
+      } catch (err: any) {
+        addLog(`❌ Failed: ${err.message}`, "error");
+      }
+      setProgressModal(prev => ({ ...prev, progress: i + 1 }));
+    }
+    
+    setProgressModal(prev => ({ ...prev, isFinished: true }));
+    setProcessingId(null);
+    fetchOrders(true);
+  };
+
+  const handleOrderBatchLabels = async (order: Order) => {
+    const readyShipments = order.shipments.filter(s => s.awbCode);
+    if (readyShipments.length === 0) {
+      setProgressModal({ isOpen: true, title: "Order Labels", progress: 1, total: 1, logs: [{ message: "No AWBs available to print in this order.", type: "info" }], isFinished: true });
+      return;
+    }
+
+    setProcessingId(`ORDER-LABEL-${order.id}`);
+    setProgressModal({ isOpen: true, title: "Fetching Labels", progress: 0, total: readyShipments.length, logs: [{ message: "Note: Ensure pop-ups are allowed to open multiple labels.", type: "info" }], isFinished: false });
+    
+    for (let i = 0; i < readyShipments.length; i++) {
+      const shipment = readyShipments[i];
+      addLog(`[${i+1}/${readyShipments.length}] Fetching label for AWB ${shipment.awbCode}...`);
+      try {
+        const res = await fetch(`/api/admin/shipments/${shipment.id}/label`);
+        const data = await res.json();
+        if (res.ok && data.labelUrl) {
+          addLog(`✅ Label opened in new tab`, "success");
+          window.open(data.labelUrl, "_blank");
+        } else {
+          addLog(`❌ Failed: ${data.message}`, "error");
+        }
+      } catch (err: any) {
+        addLog(`❌ Failed: ${err.message}`, "error");
+      }
+      setProgressModal(prev => ({ ...prev, progress: i + 1 }));
+    }
+    
+    setProgressModal(prev => ({ ...prev, isFinished: true }));
+    setProcessingId(null);
+  };
+
+  const handleSchedulePickup = async (orderId: string) => {
+    setProcessingId(`PICKUP-${orderId}`);
+    setProgressModal({ isOpen: true, title: "Scheduling Pickup", progress: 0, total: 1, logs: [], isFinished: false });
+    addLog(`Scheduling pickup for order: ${orderId}...`);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/pickup`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        addLog(`✅ Pickup Scheduled successfully!`, "success");
+        if (data.pickupTokenNumber) {
+           addLog(`Token: ${data.pickupTokenNumber}`, "success");
+        }
+        fetchOrders(true);
+      } else {
+        addLog(`❌ Pickup Error: ${data.message}`, "error");
+      }
+    } catch (err: any) {
+      addLog(`❌ Failed to schedule pickup: ${err.message}`, "error");
+    } finally {
+      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
+      setProcessingId(null);
+    }
+  };
+
+  // --- PER-SHIPMENT HANDLERS ---
   const handleAssignAwb = async (shipmentId: string) => {
     setProcessingId(`AWB-${shipmentId}`);
     setProgressModal({ isOpen: true, title: "Assigning AWB", progress: 0, total: 1, logs: [], isFinished: false });
@@ -367,30 +485,6 @@ export default function AdminOrders() {
     }
   };
 
-  const downloadLabels = async () => {
-    setProcessingId("DOWNLOAD_LABELS");
-    setProgressModal({ isOpen: true, title: "Downloading Labels", progress: 0, total: 1, logs: [], isFinished: false });
-    addLog(`Generating batch label PDF for today...`);
-    try {
-      const res = await fetch("/api/admin/labels/download-today");
-      if (!res.ok) throw new Error("Download failed");
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `labels-${new Date().toISOString().slice(0, 10)}.pdf`;
-      a.click();
-      addLog(`✅ Batch labels downloaded successfully!`, "success");
-    } catch (err: any) {
-
-      addLog(`❌ Failed to download labels: ${err.message}`, "error");
-    } finally {
-      setProgressModal(prev => ({ ...prev, progress: 1, isFinished: true }));
-      setProcessingId(null);
-    }
-  };
-
   // --- SEARCH AND FILTER LOGIC ---
   const filteredOrders = orders.filter((order) => {
     const query = searchTerm.toLowerCase().trim();
@@ -402,7 +496,14 @@ export default function AdminOrders() {
       (order.shopifyMapping?.shopifyOrderId && order.shopifyMapping.shopifyOrderId.toLowerCase().includes(query)) ||
       (order.razorpayPaymentId && order.razorpayPaymentId.toLowerCase().includes(query));
 
-    const matchesStatus = statusFilter === "ALL" || order.status === statusFilter;
+    let matchesStatus = false;
+    if (statusFilter === "ALL") {
+      matchesStatus = true;
+    } else if (statusFilter === "ACTIVE") {
+      matchesStatus = !["CANCELLED", "DELIVERED"].includes(order.status);
+    } else {
+      matchesStatus = order.status === statusFilter;
+    }
 
     return matchesQuery && matchesStatus;
   });
@@ -449,7 +550,7 @@ export default function AdminOrders() {
               disabled={processingId === "BATCH_SPLIT"}
               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
             >
-              <Zap size={15} className={processingId === "BATCH_SPLIT" ? "animate-spin" : ""} /> Batch Split Today's Orders
+              <Zap size={15} className={processingId === "BATCH_SPLIT" ? "animate-spin" : ""} /> Batch Split All Pending
             </button>
             <button
               onClick={handleBatchAssignAwb}
@@ -463,7 +564,7 @@ export default function AdminOrders() {
               disabled={processingId === "DOWNLOAD_LABELS"}
               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-black hover:bg-neutral-800 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50"
             >
-              <Download size={15} className={processingId === "DOWNLOAD_LABELS" ? "animate-spin" : ""} /> Download Today's Labels
+              <Download size={15} className={processingId === "DOWNLOAD_LABELS" ? "animate-spin" : ""} /> Batch Labels
             </button>
           </div>
         </div>
@@ -491,7 +592,8 @@ export default function AdminOrders() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="bg-gray-50 border border-gray-200 text-xs rounded-lg p-2 font-medium focus:ring-1 focus:ring-black outline-none"
             >
-              <option value="ALL">All Statuses</option>
+              <option value="ACTIVE">Active (Unfulfilled)</option>
+              <option value="ALL">All Orders</option>
               <option value="PENDING">Pending</option>
               <option value="PROCESSING">Processing</option>
               <option value="SHIPPED">Shipped</option>
@@ -609,16 +711,16 @@ export default function AdminOrders() {
                       className="bg-gray-50 border-t border-gray-200"
                     >
                       {/* TAB NAVIGATION & PER-ORDER TOP ACTIONS */}
-                      <div className="px-6 py-3 bg-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div className="px-6 py-3 bg-white border-b border-gray-200 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
                         {/* Tabs */}
-                        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                        <div className="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-lg">
                           <button
                             onClick={() => setTab(order.id, "items")}
                             className={`px-3 py-1.5 text-xs font-bold rounded-md transition ${
                               currentTab === "items" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"
                             }`}
                           >
-                            Products & Items ({order.orderItems.length})
+                            Products ({order.orderItems.length})
                           </button>
                           <button
                             onClick={() => setTab(order.id, "shipments")}
@@ -626,7 +728,7 @@ export default function AdminOrders() {
                               currentTab === "shipments" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"
                             }`}
                           >
-                            Shipments & Splits ({order.shipments?.length || 0})
+                            Splits ({order.shipments?.length || 0})
                           </button>
                           <button
                             onClick={() => setTab(order.id, "customer")}
@@ -634,12 +736,12 @@ export default function AdminOrders() {
                               currentTab === "customer" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-black"
                             }`}
                           >
-                            Customer & Payment Meta
+                            Customer & Meta
                           </button>
                         </div>
 
-                        {/* Top Per-Order Action Buttons */}
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                        {/* Top Per-Order Action Buttons (Added Batch + Pickup here) */}
+                        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                           <button
                             onClick={() => handleSyncShopify(order.id)}
                             disabled={processingId === `SYNC-${order.id}`}
@@ -652,10 +754,33 @@ export default function AdminOrders() {
                           <button
                             onClick={() => handleSingleSplit(order.id)}
                             disabled={processingId === `SPLIT-${order.id}`}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-md text-xs font-bold transition shadow-2xs"
+                          >
+                            <Truck size={13} /> Split Packages
+                          </button>
+                          
+                          <button
+                            onClick={() => handleOrderBatchAssignAwb(order)}
+                            disabled={processingId === `ORDER-AWB-${order.id}`}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-md text-xs font-bold transition shadow-2xs"
+                          >
+                            <Truck size={13} className={processingId === `ORDER-AWB-${order.id}` ? "animate-spin" : ""} /> Assign AWBs
+                          </button>
+                          
+                          <button
+                            onClick={() => handleOrderBatchLabels(order)}
+                            disabled={processingId === `ORDER-LABEL-${order.id}`}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-gray-100 border border-gray-300 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-md text-xs font-bold transition shadow-2xs"
+                          >
+                            <FileText size={13} className={processingId === `ORDER-LABEL-${order.id}` ? "animate-spin" : ""} /> Get Labels
+                          </button>
+
+                          <button
+                            onClick={() => handleSchedulePickup(order.id)}
+                            disabled={processingId === `PICKUP-${order.id}`}
                             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-black hover:bg-neutral-800 text-white px-3 py-1.5 rounded-md text-xs font-bold transition shadow-2xs"
                           >
-                            <Truck size={13} />
-                            {processingId === `SPLIT-${order.id}` ? "Splitting..." : "Split Package"}
+                            <CalendarDays size={13} /> Schedule Pickup
                           </button>
                         </div>
                       </div>
@@ -874,45 +999,45 @@ export default function AdminOrders() {
 
       {progressModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-brand-bg border border-brand-border rounded-sm shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="p-4 border-b border-brand-border flex justify-between items-center bg-brand-stone/30">
-              <h2 className="text-[11px] font-bold text-brand-charcoal uppercase tracking-widest flex items-center gap-2">
-                {!progressModal.isFinished && <RefreshCw size={14} className="animate-spin text-brand-olive" />}
+          <div className="bg-white border border-gray-200 rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h2 className="text-[11px] font-bold text-gray-800 uppercase tracking-widest flex items-center gap-2">
+                {!progressModal.isFinished && <RefreshCw size={14} className="animate-spin text-black" />}
                 {progressModal.title}
               </h2>
               {progressModal.isFinished && (
-                <button onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))} className="text-brand-textSec hover:text-brand-charcoal transition-colors">
+                <button onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))} className="text-gray-400 hover:text-black transition-colors">
                   <X size={16} />
                 </button>
               )}
             </div>
             
-            <div className="p-4 border-b border-brand-border">
-              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-brand-textSec mb-2">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                 <span>Progress</span>
                 <span>{progressModal.progress} / {progressModal.total}</span>
               </div>
-              <div className="w-full bg-brand-stone/50 rounded-full h-1.5 overflow-hidden border border-brand-border/50">
+              <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
                 <div 
-                  className="bg-brand-olive h-full transition-all duration-300" 
+                  className="bg-black h-full transition-all duration-300" 
                   style={{ width: `${progressModal.total > 0 ? (progressModal.progress / progressModal.total) * 100 : 100}%` }} 
                 />
               </div>
             </div>
 
-            <div className="p-4 overflow-y-auto flex-1 bg-brand-card font-mono text-[10px] sm:text-[11px] space-y-2 border-b border-brand-border/50">
+            <div className="p-4 overflow-y-auto flex-1 bg-white font-mono text-[10px] sm:text-[11px] space-y-2 border-b border-gray-200">
               {progressModal.logs.map((log, idx) => (
-                <div key={idx} className={`${log.type === 'error' ? 'text-rose-600 font-semibold' : log.type === 'success' ? 'text-emerald-700 font-medium' : 'text-brand-textSec'}`}>
+                <div key={idx} className={`${log.type === 'error' ? 'text-rose-600 font-semibold' : log.type === 'success' ? 'text-emerald-700 font-medium' : 'text-gray-600'}`}>
                   {log.message}
                 </div>
               ))}
             </div>
 
             {progressModal.isFinished && (
-              <div className="p-4 bg-brand-stone/20 text-right">
+              <div className="p-4 bg-gray-50 text-right">
                 <button 
                   onClick={() => setProgressModal(prev => ({...prev, isOpen: false}))}
-                  className="bg-brand-btn text-white px-6 py-2 rounded-sm text-[11px] uppercase tracking-widest font-semibold hover:opacity-90 transition-opacity"
+                  className="bg-black text-white px-6 py-2 rounded-md text-[11px] uppercase tracking-widest font-semibold hover:opacity-90 transition-opacity"
                 >
                   Close
                 </button>
