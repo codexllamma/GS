@@ -75,8 +75,7 @@ export async function executeOrderSplit(internalOrderId: string) {
   const totalUnits = expandedUnits.length;
   if (totalUnits === 0) throw new Error("Order has no line items.");
 
-  // OVERRIDE: Distribute the exact database subtotal equally across all physical units 
-  // This ensures cart-level discounts are correctly reflected in the COD calculations
+  // Distribute the exact database subtotal equally across all physical units 
   const effectiveUnitPrice = Number((order.subtotal / totalUnits).toFixed(2));
   for (const unit of expandedUnits) {
     unit.price = effectiveUnitPrice;
@@ -93,7 +92,6 @@ export async function executeOrderSplit(internalOrderId: string) {
   const email = order.user?.email || "customer@example.com";
   const phone = order.user?.phoneNumber || "9999999999";
   
-  // Validating against ENUM 'PaymentMethod' (COD or RAZORPAY)
   const paymentMethod = order.paymentMethod === "COD" ? "COD" : "Prepaid";
   const pickupLocation = process.env.SHIPROCKET_PICKUP_LOCATION || "Home";
 
@@ -103,7 +101,10 @@ export async function executeOrderSplit(internalOrderId: string) {
   for (let i = 0; i < totalUnits; i += 2) {
     const chunk = expandedUnits.slice(i, i + 2);
     const count = chunk.length;
-    const subOrderId = `${rawOrderId}-${Math.floor(i / 2) + 1}`;
+    
+    // Generate a uniquely randomized subOrderId to bypass Shiprocket's deleted-ID cache
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const subOrderId = `${rawOrderId}-${Math.floor(i / 2) + 1}-${randomSuffix}`;
     
     // Calculate base product total for this chunk using the discounted unit prices
     let subTotal = Number(chunk.reduce((acc, u) => acc + u.price, 0).toFixed(2));
@@ -130,7 +131,7 @@ export async function executeOrderSplit(internalOrderId: string) {
           name: unit.name,
           sku: unit.sku,
           units: 1,
-          price: unit.price, // Uses the effectiveUnitPrice automatically
+          price: unit.price,
         });
       }
     }
