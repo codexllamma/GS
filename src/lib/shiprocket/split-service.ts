@@ -67,13 +67,20 @@ export async function executeOrderSplit(internalOrderId: string) {
         orderItemId: item.id,
         name: item.product.name,
         sku: item.variantId,
-        price: item.priceAtPurchase,
+        price: item.priceAtPurchase, 
       });
     }
   }
 
   const totalUnits = expandedUnits.length;
   if (totalUnits === 0) throw new Error("Order has no line items.");
+
+  // OVERRIDE: Distribute the exact database subtotal equally across all physical units 
+  // This ensures cart-level discounts are correctly reflected in the COD calculations
+  const effectiveUnitPrice = Number((order.subtotal / totalUnits).toFixed(2));
+  for (const unit of expandedUnits) {
+    unit.price = effectiveUnitPrice;
+  }
 
   const token = await getShiprocketToken();
 
@@ -98,14 +105,17 @@ export async function executeOrderSplit(internalOrderId: string) {
     const count = chunk.length;
     const subOrderId = `${rawOrderId}-${Math.floor(i / 2) + 1}`;
     
-    // Calculate base product total for this chunk
-    let subTotal = chunk.reduce((acc, u) => acc + u.price, 0);
+    // Calculate base product total for this chunk using the discounted unit prices
+    let subTotal = Number(chunk.reduce((acc, u) => acc + u.price, 0).toFixed(2));
 
     // Apply the COD delivery charge strictly to the first package
     const isFirstPackage = i === 0;
     if (isFirstPackage && order.deliveryCharge) {
       subTotal += order.deliveryCharge;
     }
+    
+    // Clean any floating point math issues
+    subTotal = Number(subTotal.toFixed(2));
 
     const uniqueOrderItemIds = Array.from(new Set(chunk.map((u) => u.orderItemId)));
 
@@ -120,7 +130,7 @@ export async function executeOrderSplit(internalOrderId: string) {
           name: unit.name,
           sku: unit.sku,
           units: 1,
-          price: unit.price,
+          price: unit.price, // Uses the effectiveUnitPrice automatically
         });
       }
     }
