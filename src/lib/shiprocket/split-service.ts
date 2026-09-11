@@ -97,7 +97,15 @@ export async function executeOrderSplit(internalOrderId: string) {
     const chunk = expandedUnits.slice(i, i + 2);
     const count = chunk.length;
     const subOrderId = `${rawOrderId}-${Math.floor(i / 2) + 1}`;
-    const subTotal = chunk.reduce((acc, u) => acc + u.price, 0);
+    
+    // Calculate base product total for this chunk
+    let subTotal = chunk.reduce((acc, u) => acc + u.price, 0);
+
+    // Apply the COD delivery charge strictly to the first package
+    const isFirstPackage = i === 0;
+    if (isFirstPackage && order.deliveryCharge) {
+      subTotal += order.deliveryCharge;
+    }
 
     const uniqueOrderItemIds = Array.from(new Set(chunk.map((u) => u.orderItemId)));
 
